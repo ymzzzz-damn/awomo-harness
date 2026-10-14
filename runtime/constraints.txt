@@ -1,0 +1,9 @@
+# Versions verified by the local QwenPaw working environment.  In particular,
+# fastmcp 4.x pulls mcp 2.x, whose streamable HTTP API is incompatible with
+# AgentScope 1.0.19.post1 used by this QwenPaw tree.
+mcp==1.29.1
+fastmcp==2.14.7
+pydantic==2.13.5
+openai==3.7.0
+agent-client-protocol==0.9.0
+

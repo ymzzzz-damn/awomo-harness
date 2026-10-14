@@ -1,0 +1,4 @@
+[console_scripts]
+awomopaw = qwenpaw.cli.main:cli
+copaw = qwenpaw.cli.main:cli
+qwenpaw = qwenpaw.cli.main:cli

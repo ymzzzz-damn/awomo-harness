@@ -1,0 +1,281 @@
+schema: embodiment_package/v3
+package_id: robodojo_sim
+name: RoboDojo Isaac Simulation Embodiment
+version: 0.5.0
+kind: embodiment_context
+license: Apache-2.0
+summary: Unified observation and action boundary for planner, VLA/WAM, and GPT fallback in RoboDojo.
+primary_agent_doc: EMBODIMENT.md
+tags: [robodojo, isaac-sim, simulation, vla, wam, qwenpaw]
+
+capabilities:
+  - {id: health, class: safe, verified: interface_only}
+  - {id: start_session, class: simulation, verified: interface_only}
+  - {id: session_status, class: safe, verified: interface_only}
+  - {id: current_observation, class: safe, verified: interface_only}
+  - {id: capture_head_frame, class: safe, verified: interface_only}
+  - {id: capture_left_wrist_frame, class: safe, verified: interface_only}
+  - {id: capture_right_wrist_frame, class: safe, verified: interface_only}
+  - {id: request_policy_chunk, class: simulation, verified: interface_only}
+  - {id: submit_direct_action_chunk, class: simulation, verified: interface_only}
+  - {id: execute_action_chunk, class: simulation, verified: interface_only}
+  - {id: abort_session, class: simulation, verified: interface_only}
+  - {id: start_evaluation, class: simulation, verified: interface_only}
+  - {id: current_evaluation, class: safe, verified: interface_only}
+  - {id: evaluation_status, class: safe, verified: interface_only}
+  - {id: evaluation_result, class: safe, verified: interface_only}
+
+hardware_requirements:
+  - role: robodojo_sim_api
+    description: Loopback bridge to the RoboDojo/Isaac simulation embodiment
+    device_type: simulator_gateway
+    connection:
+      protocol: http
+      required_paths:
+        - GET /health
+        - POST /v1/sessions
+        - GET /v1/sessions/status
+        - GET /v1/sessions/observation
+        - GET /v1/sessions/observation/image
+        - POST /v1/sessions/policy-chunks
+        - POST /v1/sessions/direct-action-chunks
+        - POST /v1/sessions/action-chunks/execute
+        - POST /v1/sessions/abort
+    hint: Bind to the loopback-only bridge, normally http://127.0.0.1:8098.
+
+registry:
+  schema: embodiment_node_registry/v2
+  nodes:
+    - id: robodojo_sim
+      name: RoboDojo Isaac simulation embodiment
+      node_type: simulator
+      participant_type: software_node
+      role: robodojo_sim_api
+      real_device: false
+      safe_capabilities: [health, session_status, current_observation, capture_head_frame, capture_left_wrist_frame, capture_right_wrist_frame, current_evaluation, evaluation_status, evaluation_result]
+      limits:
+        environment: simulation
+        loopback_only: true
+        embodiment_applies_actions: true
+        canonical_action_schema: robodojo.action-chunk/v1
+        reward_observation_forbidden: true
+        privileged_state_forbidden: true
+        direct_action_max_horizon: 1
+      tool_interface:
+        protocol: http
+        endpoint: "@role:robodojo_sim_api"
+        operations:
+          - operation_id: health
+            description: Read bridge, provider registry, assets, and active simulation readiness.
+            method: GET
+            path: /health
+            input_schema: {type: object, properties: {}, additionalProperties: false}
+            safety_class: safe
+            execution: {timeout_seconds: 5}
+
+          - operation_id: start_session
+            description: Start one interactive RoboDojo episode with a registered VLA or WAM provider.
+            method: POST
+            path: /v1/sessions
+            input_schema:
+              type: object
+              properties:
+                task: {type: string, pattern: "^[A-Za-z][A-Za-z0-9_]{0,127}$"}
+                policy_id: {type: string, pattern: "^[a-z][a-z0-9_-]{0,63}$"}
+                seed: {type: integer, minimum: 0, maximum: 2147483647, default: 0}
+              required: [task, policy_id]
+              additionalProperties: false
+            safety_class: simulation
+            execution: {timeout_seconds: 15}
+
+          - operation_id: session_status
+            description: Read the active episode state, provider failure signal, and pending chunk metadata.
+            method: GET
+            path: /v1/sessions/status
+            input_schema: {type: object, properties: {}, additionalProperties: false}
+            safety_class: safe
+            execution: {timeout_seconds: 15}
+
+          - operation_id: current_observation
+            description: Read fresh image paths, public robot state, and the canonical action specification. Never returns reward or privileged simulator state.
+            method: GET
+            path: /v1/sessions/observation
+            input_schema: {type: object, properties: {}, additionalProperties: false}
+            safety_class: safe
+            execution: {timeout_seconds: 15}
+
+          - operation_id: capture_head_frame
+            description: Load the current head-camera RGB frame as a model-visible image for planning and progress checks.
+            protocol: http_snapshot
+            method: GET
+            path: /v1/sessions/observation/image
+            input_schema: {type: object, properties: {}, additionalProperties: false}
+            safety_class: safe
+            execution: {timeout_seconds: 15, topic: cam_head}
+
+          - operation_id: capture_left_wrist_frame
+            description: Load the current left-wrist RGB frame for contact and alignment reasoning.
+            protocol: http_snapshot
+            method: GET
+            path: /v1/sessions/observation/image
+            input_schema: {type: object, properties: {}, additionalProperties: false}
+            safety_class: safe
+            execution: {timeout_seconds: 15, topic: cam_left_wrist}
+
+          - operation_id: capture_right_wrist_frame
+            description: Load the current right-wrist RGB frame for contact and alignment reasoning.
+            protocol: http_snapshot
+            method: GET
+            path: /v1/sessions/observation/image
+            input_schema: {type: object, properties: {}, additionalProperties: false}
+            safety_class: safe
+            execution: {timeout_seconds: 15, topic: cam_right_wrist}
+
+          - operation_id: request_policy_chunk
+            description: Send the current observation and planner subtask to the active registered VLA/WAM; returns a validated unexecuted chunk id.
+            method: POST
+            path: /v1/sessions/policy-chunks
+            input_schema:
+              type: object
+              properties:
+                observation_id: {type: string, minLength: 8, maxLength: 64}
+                provider_id: {type: string, pattern: "^[a-z][a-z0-9_-]{0,63}$"}
+                subtask_goal: {type: string, minLength: 1, maxLength: 1000}
+                optimized_task_prompt: {type: string, minLength: 1, maxLength: 3000}
+                planning_summary: {type: string, maxLength: 2000, default: ""}
+              required: [observation_id, provider_id, subtask_goal, optimized_task_prompt]
+              additionalProperties: false
+            safety_class: simulation
+            execution: {timeout_seconds: 190}
+
+          - operation_id: submit_direct_action_chunk
+            description: Submit a bounded GPT-generated action chunk after an explicit provider inability signal; the embodiment validates but does not yet execute it.
+            method: POST
+            path: /v1/sessions/direct-action-chunks
+            input_schema:
+              type: object
+              properties:
+                observation_id: {type: string, minLength: 8, maxLength: 64}
+                subtask_goal: {type: string, minLength: 1, maxLength: 1000}
+                fallback_reason: {type: string, minLength: 1, maxLength: 1000}
+                rationale: {type: string, maxLength: 2000, default: ""}
+                actions:
+                  type: array
+                  minItems: 1
+                  maxItems: 1
+                  items:
+                    type: object
+                    minProperties: 1
+                    additionalProperties:
+                      type: array
+                      minItems: 1
+                      maxItems: 32
+                      items: {type: number}
+              required: [observation_id, subtask_goal, fallback_reason, actions]
+              additionalProperties: false
+            safety_class: simulation
+            execution: {timeout_seconds: 30}
+
+          - operation_id: execute_action_chunk
+            description: Execute one previously validated VLA/WAM or GPT chunk through the RoboDojo embodiment and return the next observation boundary.
+            method: POST
+            path: /v1/sessions/action-chunks/execute
+            input_schema:
+              type: object
+              properties:
+                chunk_id: {type: string, minLength: 8, maxLength: 64}
+              required: [chunk_id]
+              additionalProperties: false
+            safety_class: simulation
+            execution: {timeout_seconds: 190}
+
+          - operation_id: abort_session
+            description: Stop the active simulated episode and preserve its trace.
+            method: POST
+            path: /v1/sessions/abort
+            input_schema:
+              type: object
+              properties:
+                reason: {type: string, maxLength: 500, default: agent_abort}
+              additionalProperties: false
+            safety_class: simulation
+            execution: {timeout_seconds: 20}
+
+          - operation_id: start_evaluation
+            description: Backward-compatible end-to-end evaluation using the default registered provider.
+            method: POST
+            path: /v1/evaluations
+            input_schema:
+              type: object
+              properties:
+                task: {type: string, pattern: "^[A-Za-z][A-Za-z0-9_]{0,127}$"}
+                eval_num: {type: integer, minimum: 1, maximum: 8, default: 1}
+                seed: {type: integer, minimum: 0, maximum: 2147483647, default: 0}
+              required: [task]
+              additionalProperties: false
+            safety_class: simulation
+            execution: {timeout_seconds: 15}
+
+          - operation_id: current_evaluation
+            description: Read the latest evaluation lifecycle state.
+            method: GET
+            path: /v1/evaluations/current
+            input_schema: {type: object, properties: {}, additionalProperties: false}
+            safety_class: safe
+            execution: {timeout_seconds: 5}
+
+          - operation_id: evaluation_status
+            description: Read lifecycle metadata for a run id.
+            method: GET
+            path: /v1/evaluations/status
+            input_schema:
+              type: object
+              properties:
+                run_id: {type: string, pattern: "^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$"}
+              required: [run_id]
+              additionalProperties: false
+            safety_class: safe
+            execution: {timeout_seconds: 15}
+
+          - operation_id: evaluation_result
+            description: Read official post-episode result and artifacts.
+            method: GET
+            path: /v1/evaluations/result
+            input_schema:
+              type: object
+              properties:
+                run_id: {type: string, pattern: "^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$"}
+              required: [run_id]
+              additionalProperties: false
+            safety_class: safe
+            execution: {timeout_seconds: 15}
+
+graphs:
+  - schema: embodiment_graph/v2
+    graph_id: robodojo_hybrid_policy_sim
+    name: GPT planner with pluggable VLA/WAM and GPT action fallback
+    intent: Plan subtasks, prefer a registered policy, and execute every action through one RoboDojo/Isaac embodiment boundary.
+    safety_level: simulation_only
+    roles: [robodojo_sim_api]
+    nodes: [robodojo_sim]
+    constraints:
+      environment: simulation
+      forbidden_actions: [physical_device_access, reward_read, privileged_state_read, score_override, seed_override, action_validation_bypass]
+    readiness_checks: [robodojo_sim.health]
+    failure_modes: [bridge_unavailable, provider_unavailable, provider_inference_failed, invalid_action, no_progress, simulator_failure]
+    recovery:
+      policy: replan_then_bounded_direct_action_or_abort
+    outputs: [episode_trace, post_episode_result, artifacts_owned_by_robodojo]
+
+safety:
+  default_policy: simulation_only
+  install_must_not_actuate: true
+  requires_confirmation_for: []
+  forbidden_actions: [physical_device_access, rosbridge, fci, usb_device_access, reward_read, privileged_state_read, score_override, seed_override, action_validation_bypass]
+
+cooperation_network:
+  default_approval: approved
+
+integration:
+  exposes_agent_context: true
+  compatible_with: [qwenpaw, robodojo, isaac-sim, xpolicylab, pi05]

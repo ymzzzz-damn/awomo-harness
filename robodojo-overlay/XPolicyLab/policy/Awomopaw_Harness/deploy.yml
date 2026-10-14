@@ -1,0 +1,19 @@
+policy_name: Awomopaw_Harness
+protocol: ws
+host: localhost
+bench_name: null
+task_name: null
+env_cfg_type: null
+seed: null
+eval_batch: false
+
+checkpoint_num: 59999
+result_dir: "./results/awomopaw-harness/"
+obs_transform_pipeline: "xspark-v1.0"
+
+action_type: joint
+policy_uv_env_path: ../Pi_05/openpi
+train_config_name: pi05_base_aloha_full_sim_arx-x5_seed_0
+repo_id: arx_x5_sim
+
+port: 6000
