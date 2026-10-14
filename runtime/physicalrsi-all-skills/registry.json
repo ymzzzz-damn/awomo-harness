@@ -1,0 +1,210 @@
+[
+  {
+    "provider_id": "pi05",
+    "kind": "vla",
+    "policy_name": "Pi_05",
+    "checkpoint": "RoboDojo-sim-arx_x5-joint-0",
+    "policy_uv_env_path": "/home/ymz/robodojo-pi05/RoboDojo/XPolicyLab/policy/Pi_05/openpi",
+    "revision": "checkpoint:RoboDojo-sim-arx_x5-joint-0:59999"
+  },
+  {
+    "provider_id": "physicalrsi-align",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Align_Skill",
+    "checkpoint": "physicalrsi-align-8f4dd9a66b463155",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:70a3d5ce6af076eaad5bf22ffc81acf6057485fe8340cb33faaa320da9651feb"
+  },
+  {
+    "provider_id": "physicalrsi-align-blocks",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-align-blocks-70a3d5ce6af076ea",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:70a3d5ce6af076eaad5bf22ffc81acf6057485fe8340cb33faaa320da9651feb"
+  },
+  {
+    "provider_id": "physicalrsi-arrange-largest-number-random",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-arrange-largest-number-random-51eab02d4a2c7f87",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:51eab02d4a2c7f8796cc37a5818004cbc05c832e84f121e00ff43bb5645bf01e"
+  },
+  {
+    "provider_id": "physicalrsi-classify-objects",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-classify-objects-10f83169684d71b0",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:10f83169684d71b097d8e59a23ac5c905a6a04e247cbcd7bec9c83304dfc24b6"
+  },
+  {
+    "provider_id": "physicalrsi-classify-objects-by-language",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-classify-objects-by-language-4ef1924c38373ce5",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:4ef1924c38373ce556edf487627d0af1a813c4c7ee3626f6c860c9a27d0d9de5"
+  },
+  {
+    "provider_id": "physicalrsi-cover-blocks",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-cover-blocks-a8e3ca718383a0f4",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:a8e3ca718383a0f42f04ef090f59ff1381534b02a48593ef4cfabb5618cf8ae5"
+  },
+  {
+    "provider_id": "physicalrsi-deposit-coin",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-deposit-coin-93ae38482ab5ff3f",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:93ae38482ab5ff3fec5812864f28bf7c01ce5fb95d197481323939cd5eeba7cd"
+  },
+  {
+    "provider_id": "physicalrsi-general-pickup",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-general-pickup-c76014a08ed84f69",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:c76014a08ed84f698e44da7abc71ff66231fab4b07129b73e95e7f6e77246e12"
+  },
+  {
+    "provider_id": "physicalrsi-insert-key",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-insert-key-543ef6d03429b920",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:543ef6d03429b920eede63eefef89407eb21b1f0c9e929de4ccd94e693bc2bb5"
+  },
+  {
+    "provider_id": "physicalrsi-insert-tubes",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-insert-tubes-2beff0202299d1db",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:2beff0202299d1db23c69c7ca60ef8882b74c578bf8b0514a7f15b18fbde9e02"
+  },
+  {
+    "provider_id": "physicalrsi-make-kong",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-make-kong-a0cd113ce8a7fd08",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:a0cd113ce8a7fd08d65721c0fc58d23d1425237a956227dfb8f45dea46d52671"
+  },
+  {
+    "provider_id": "physicalrsi-play-tic-tac-toe",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-play-tic-tac-toe-3f3efc0940e55724",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:3f3efc0940e55724b9e6b49e96e12122b5f093ecdaf72740f76df8a8d8e5dde3"
+  },
+  {
+    "provider_id": "physicalrsi-plug-in-charger",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-plug-in-charger-85513a85687eff20",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:85513a85687eff20af5c83ebe7df4cc664e398b6f8fb86f2094fa7528ab19c58"
+  },
+  {
+    "provider_id": "physicalrsi-pour-balls-into-vase",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-pour-balls-into-vase-53733d4aed99c4a4",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:53733d4aed99c4a4aea236106f64a4da557ab5e54a76c1ae236d20c59fef80aa"
+  },
+  {
+    "provider_id": "physicalrsi-pour-by-language",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-pour-by-language-545bde45b527d5b3",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:545bde45b527d5b3e7f039865e55f24d192106be30312931b9384af98ed6ff14"
+  },
+  {
+    "provider_id": "physicalrsi-pour-liquid-into-cup",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-pour-liquid-into-cup-662f871a3733a282",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:662f871a3733a282f70f5b80596203f0f9460e5db826199279197f228a6c1c33"
+  },
+  {
+    "provider_id": "physicalrsi-press-by-number",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-press-by-number-4a8b77a2f49eac65",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:4a8b77a2f49eac651843c144fd1a4ddf116f88d6967bfb009aeaee59f0b72c04"
+  },
+  {
+    "provider_id": "physicalrsi-push-t",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-push-t-a3f589ab717cfeb1",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:a3f589ab717cfeb172ef65aaeb8f433722aded5207ee095c8e84956e9ddbe048"
+  },
+  {
+    "provider_id": "physicalrsi-solve-equation",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-solve-equation-2469c0210d28068c",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:2469c0210d28068cf23434666dca2b77fdeeeb94db724961b8cb7d3f24ebe124"
+  },
+  {
+    "provider_id": "physicalrsi-sort-nesting-dolls-by-size",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-sort-nesting-dolls-by-size-bb18b8cd3d6c4ccc",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:bb18b8cd3d6c4ccc5003340c731d7064d9c146d70834fb7c0589017fc806ac1c"
+  },
+  {
+    "provider_id": "physicalrsi-stack-blocks-by-language",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-stack-blocks-by-language-a2db4df53b20c06b",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:a2db4df53b20c06b44ce7ac45f9a6d0f5f1fb3967ee6352015545d57516614c4"
+  },
+  {
+    "provider_id": "physicalrsi-store-tools-in-toolbox",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-store-tools-in-toolbox-aa30544c987b5a89",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:aa30544c987b5a89a24d7d8b8478cd76d2e8470f4354c48807c2268b8da79325"
+  },
+  {
+    "provider_id": "physicalrsi-swap-t",
+    "kind": "code",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-swap-t-c61bf76e5139992d",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-code:c61bf76e5139992d85ea948e4160ec77f9cf73f236728628a4888acf6624cb70"
+  },
+  {
+    "provider_id": "physicalrsi-pi05",
+    "kind": "vla",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-pi05-d46b27889c4fb172",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-source:d46b27889c4fb172e457cfd6c937e30d92012593daa75c82f4b8e853c933a227"
+  },
+  {
+    "provider_id": "physicalrsi-pi05-sparse-memory",
+    "kind": "vla",
+    "policy_name": "PhysicalRSI_Frozen_Skills",
+    "checkpoint": "rsi-pi05-sparse-memory-1546a83a5861e1d1",
+    "policy_uv_env_path": "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi",
+    "revision": "frozen-source:1546a83a5861e1d1160bc5bd2f2a2059065ca9d451a2824be3235ac072709be4"
+  }
+]

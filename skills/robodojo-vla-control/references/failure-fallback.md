@@ -7,28 +7,27 @@ Route away from the active VLA/WAM when one of these is observed:
 - provider unavailable, timeout, disconnect, or server instance change;
 - adapter-declared unsupported/OOD;
 - empty chunk, invalid shape/type, NaN/Inf, or action rejection;
-- repeated actions or unchanged public visual state across a bounded subtask
-  budget after one meaningful prompt revision.
+- clearly wrong object, operation or trajectory in the first executed window;
+- repeated actions or unchanged public visual state across a bounded subtask budget.
 
 Do not use hidden reward or in-episode success to detect failure. A difficult
 scene, low confidence alone, or one ambiguous frame is not enough to take over.
 
 ## Recovery order
 
-1. Re-read the latest observation and confirm the failure belongs to the provider,
-   not a stale id or ended episode.
-2. If the subtask/prompt was ambiguous, revise it once and request a fresh policy
-   chunk from the current observation.
-3. If the provider still cannot continue, replan the subtask and use one bounded
-   GPT direct-action chunk matching the current action spec.
-4. Observe again. Return to the registered provider when the blockage is removed;
-   do not leave GPT in an unbounded low-level loop.
-5. Abort if the action cannot be grounded safely, validation keeps failing, the
-   simulator is unhealthy, or the episode budget is nearly exhausted.
+1. Read fresh public state and all three cameras after every executed window.
+2. Submit `reflect_action_chunk` with before/after evidence and a verdict:
+   `continue` for useful progress, `correct` for a clear deviation/provider error,
+   `uncertain` for insufficient evidence.
+3. On `correct`, immediately use one grounded GPT direct action or generate a
+   Python policy through the primitive API. Do not require a retry/prompt revision.
+4. Reobserve after correction and submit another reflection. Return to VLA/WAM
+   only on `continue`. Delegated code owns its primitives until it returns.
+5. On `uncertain`, inspect again or abort; neither controller may move until
+   reassessment. Abort on simulator failure, stale identities or exhausted budget.
 
 The `fallback_reason` must name an observable signal, such as
-`pi05 timeout at observation <id>` or `no visual progress after two validated
-chunks and one prompt revision`. Avoid vague reasons such as “model seems bad.”
+`pi05 timeout at observation <id>` or `the first window moved a different object than the requested target`. Avoid vague reasons such as “model seems bad.”
 
 ## GPT direct-action constraints
 

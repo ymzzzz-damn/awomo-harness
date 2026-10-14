@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>RoboDojo · 推理轨迹</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body>
+<header class="topbar"><a class="brand" href="/"><span class="brand-mark">R<span>·</span></span><strong>RoboDojo</strong><span class="brand-divider"></span><span class="brand-sub">推理轨迹</span></a><div class="top-actions"><span class="live-dot"></span><span id="sync-label">读取本地评测记录</span><button id="refresh" class="button small">↻ 刷新</button></div></header>
+<div class="shell">
+<aside class="sidebar">
+<div class="side-intro"><span class="eyebrow">EVALUATION EXPLORER</span><h1>场景浏览器</h1><p>每一次执行，都有迹可循。</p></div>
+<label class="field">任务 <span>TASK</span><select id="task" aria-label="任务"></select></label>
+<label class="field">评测组 <span>GROUP</span><select id="experiment" aria-label="评测组"></select></label>
+<div id="batch-summary" class="batch-summary"></div>
+<label class="field">评测 seed<select id="seed" aria-label="评测 seed"><option value="all">全部 seed</option></select></label>
+<div id="filters" class="filters" aria-label="结果筛选"><button class="active" data-status="all">全部</button><button data-status="success">成功</button><button data-status="failure">失败</button><button data-status="other">其他</button></div>
+<label class="search"><span>⌕</span><input id="search" placeholder="查找场景，例如 006 或 1-006" aria-label="查找场景"></label>
+<div class="legend"><span><i class="success"></i>成功</span><span><i class="failure"></i>失败</span><span><i class="pending"></i>未评测</span><span><i class="error"></i>异常</span></div>
+<div id="scene-list" class="scene-list"></div>
+<div class="side-footer"><span class="local-icon">◈</span><div>本地评测产物<p>每 15 秒更新场景结果</p></div></div>
+</aside>
+<main id="workspace"><div class="loading">正在读取评测记录…</div></main>
+</div>
+<div id="toast" role="status" class="toast" hidden></div>
+</body></html>

@@ -1,0 +1,21 @@
+{
+  "contains_api_key": false,
+  "deployment_mode": "simulation-only",
+  "excluded_interfaces": [
+    "franka_fr3",
+    "jetrover_base",
+    "jetrover_camera_arm",
+    "unitree_g1",
+    "unitree_g1_sensor_only",
+    "g1_usb_dual_view",
+    "usb_1080p_camera"
+  ],
+  "git_head": "e6e0dcd85b11212d3bf945a724adc295baa03902",
+  "git_status_digest": "923ccae5a61de6abd57dddb3cdbc5f893611eee83b09c9bc8cd6896770f545e9",
+  "included_embodiments": [
+    "robodojo_sim"
+  ],
+  "release_tree_sha256": "ed28c37dd22b89875d48bebf4d2ab17a12fd8d585847c25cc306d46397b2be62",
+  "source": "local QwenPaw working tree",
+  "source_tree_sha256": "1d3cd64ac6d9451f4b4c0e80ab36f575d9ceaf7d893e32aa3cb7e7bac6606507"
+}

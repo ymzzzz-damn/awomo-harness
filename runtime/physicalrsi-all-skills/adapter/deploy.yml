@@ -1,0 +1,14 @@
+policy_name: PhysicalRSI_Frozen_Skills
+protocol: ws
+host: localhost
+port: null
+bench_name: null
+task_name: null
+ckpt_name: null
+env_cfg_type: null
+seed: null
+action_type: joint
+gpu_id: null
+eval_batch: false
+policy_uv_env_path: /data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi
+request_timeout_s: 1800

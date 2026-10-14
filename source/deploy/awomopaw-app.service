@@ -1,0 +1,18 @@
+[Unit]
+Description=awomopaw local application
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ymz/physclaw/awomopaw
+ExecStart=/home/ymz/physclaw/awomopaw/.venv/bin/awomopaw app --host 127.0.0.1 --port 8088
+Restart=on-failure
+RestartSec=2
+KillSignal=SIGINT
+TimeoutStopSec=15
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target
+

@@ -146,6 +146,8 @@ def _action_spec(task_env: Any, observation: dict[str, Any]) -> dict[str, Any]:
         "required_fields": required,
         "max_policy_actions": _MAX_POLICY_ACTIONS,
         "max_direct_actions": _MAX_DIRECT_ACTIONS,
+        "supports_execution_window": True,
+        "max_execution_actions": _MAX_POLICY_ACTIONS,
         "execution_owner": "robodojo_sim_embodiment",
     }
 
@@ -167,6 +169,7 @@ class InteractiveEpisodeHarness:
         self._observation_sequence = 0
         self._observation_received_at: float | None = None
         self._observation: dict[str, Any] | None = None
+        self._initial_robot_state: dict[str, Any] | None = None
         self._observation_id: str | None = None
         self._observation_paths: dict[str, str] = {}
         self._pending_actions: list[dict[str, Any]] = []
@@ -222,6 +225,8 @@ class InteractiveEpisodeHarness:
             paths[str(camera_name)] = str(path)
 
         with self._lock:
+            if self._initial_robot_state is None:
+                self._initial_robot_state = _public_robot_state(observation)
             self._observation_sequence += 1
             self._observation = observation
             self._observation_id = observation_id
@@ -231,6 +236,7 @@ class InteractiveEpisodeHarness:
         self._trace(
             "observation",
             observation_id=observation_id,
+            official_instruction=observation.get("instruction"),
             cameras=sorted(paths),
             action_count=int(self.task_env.take_action_cnt[0]),
         )
@@ -275,7 +281,12 @@ class InteractiveEpisodeHarness:
         with self._lock:
             observation = deepcopy(self._observation) or {}
             status["image_paths"] = dict(self._observation_paths)
+        # Task language is already part of the policy's public observation.
+        # Expose it to the planner too, including dynamic color/category goals,
+        # so it never has to infer the requested task from privileged layouts.
+        status["instruction"] = observation.get("instruction", "")
         status["robot_state"] = _public_robot_state(observation)
+        status["initial_robot_state"] = deepcopy(self._initial_robot_state)
         status["action_spec"] = _action_spec(self.task_env, observation)
         return status
 
@@ -288,6 +299,16 @@ class InteractiveEpisodeHarness:
         if received_at is None or time.monotonic() - received_at > self._max_observation_age_s:
             raise ValueError("observation exceeded the bounded freshness window")
         return expected_id
+
+    @staticmethod
+    def _require_official_instruction(observation: dict[str, Any]) -> str:
+        instruction = observation.get("instruction")
+        if not isinstance(instruction, str) or not instruction.strip():
+            raise ValueError(
+                "official task instruction is unavailable; do not infer the goal "
+                "from a task name or substitute a planner-authored task"
+            )
+        return instruction
 
     def snapshot_path(self, topic: str) -> Path:
         with self._lock:
@@ -383,6 +404,7 @@ class InteractiveEpisodeHarness:
         self._trace(
             "action_chunk_ready",
             observation_id=observation_id,
+            official_instruction=(self._observation or {}).get("instruction"),
             chunk_id=chunk_id,
             source=source,
             provider_id=provider_id,
@@ -408,6 +430,7 @@ class InteractiveEpisodeHarness:
         expected_id = self._require_current_observation(payload.get("observation_id"))
         if observation is None:
             raise ValueError("current observation is unavailable")
+        self._require_official_instruction(observation)
         if self.task_env.end_flag[0]:
             raise ValueError("episode has already ended")
         provider_id = " ".join(str(payload.get("provider_id") or "").split())
@@ -456,6 +479,8 @@ class InteractiveEpisodeHarness:
 
     def _handle_direct_action(self, payload: dict[str, Any]) -> dict[str, Any]:
         expected_id = self._require_current_observation(payload.get("observation_id"))
+        with self._lock:
+            self._require_official_instruction(self._observation or {})
         if self.task_env.end_flag[0]:
             raise ValueError("episode has already ended")
         subtask_goal = " ".join(str(payload.get("subtask_goal") or "").split())
@@ -483,6 +508,15 @@ class InteractiveEpisodeHarness:
         )
 
     def _handle_execute(self, payload: dict[str, Any]) -> dict[str, Any]:
+        max_actions = payload.get("max_actions")
+        discard_remaining = payload.get("discard_remaining", False)
+        if max_actions is not None and (
+            isinstance(max_actions, bool) or not isinstance(max_actions, int)
+            or not 1 <= max_actions <= _MAX_POLICY_ACTIONS
+        ):
+            raise ValueError("max_actions must be an integer from 1 to 256")
+        if not isinstance(discard_remaining, bool):
+            raise ValueError("discard_remaining must be a boolean")
         with self._lock:
             chunk_id = self._pending_chunk_id
             cursor = self._action_cursor
@@ -508,7 +542,7 @@ class InteractiveEpisodeHarness:
 
         executed = 0
         try:
-            while cursor < len(actions):
+            while cursor < len(actions) and (max_actions is None or executed < max_actions):
                 action = actions[cursor]
                 self.task_env.take_action(action)
                 executed += 1
@@ -517,9 +551,8 @@ class InteractiveEpisodeHarness:
                     self._action_cursor = cursor
                 if self.task_env.is_episode_end():
                     break
-                # Mirror the official policy loop: keep the VLA's temporal
-                # observation state current while draining its chunk, but do not
-                # invoke the LLM until the whole chunk reaches a boundary.
+                # Keep the provider's observation current during execution.
+                # The planner is called only after this execution window ends.
                 if cursor < len(actions) and source == "policy":
                     intermediate_observation = self.task_env.get_obs()
                     intermediate_observation["instruction"] = task_prompt
@@ -558,11 +591,15 @@ class InteractiveEpisodeHarness:
         with self._lock:
             remaining = max(0, len(self._pending_actions) - self._action_cursor)
             chunk_complete = remaining == 0
-            if chunk_complete or episode_end:
+            discarded = remaining if discard_remaining and not episode_end else 0
+            released = chunk_complete or episode_end or discard_remaining
+            if released:
                 self._pending_chunk_id = None
                 self._pending_source = None
                 self._pending_provider_id = None
                 self._pending_created_at = None
+                self._pending_actions = []
+                self._action_cursor = 0
         self._trace(
             "action_chunk_execution",
             chunk_id=chunk_id,
@@ -570,6 +607,9 @@ class InteractiveEpisodeHarness:
             provider_id=provider_id,
             executed=executed,
             chunk_complete=chunk_complete,
+            max_actions=max_actions,
+            discarded_actions=discarded,
+            chunk_released=released,
             outcome=outcome,
             observation_id=self._observation_id,
             action_count=int(self.task_env.take_action_cnt[0]),
@@ -579,6 +619,11 @@ class InteractiveEpisodeHarness:
             "executed": executed,
             "chunk_complete": chunk_complete,
             "remaining_in_chunk": remaining,
+            "pending_actions_remaining": 0 if released else remaining,
+            "max_actions": max_actions,
+            "discarded_actions": discarded,
+            "chunk_released": released,
+            "action_count": int(self.task_env.take_action_cnt[0]),
             "observation_id": self._observation_id,
             "episode_end": episode_end,
             "task_success": task_success,
@@ -586,7 +631,7 @@ class InteractiveEpisodeHarness:
             "source": source,
             "provider_id": provider_id,
             "instruction": (
-                "This is an action-chunk boundary. Inspect the fresh camera frame, "
+                "This is an execution-window boundary. Inspect the fresh camera frame, "
                 "judge whether the current subtask is complete, then continue, "
                 "revise, or replace the subtask before requesting the next chunk."
             ),
@@ -641,6 +686,8 @@ class InteractiveEpisodeHarness:
         class ExecuteRequest(BaseModel):
             model_config = ConfigDict(extra="forbid")
             chunk_id: str = Field(min_length=8, max_length=64)
+            max_actions: int | None = Field(default=None, ge=1, le=_MAX_POLICY_ACTIONS, strict=True)
+            discard_remaining: bool = False
 
         class DirectActionRequest(BaseModel):
             model_config = ConfigDict(extra="forbid")

@@ -9,6 +9,8 @@
 - `robot_state`: finite public proprioception only;
 - `action_spec`: dynamic field names, dimensions, gripper convention, and limits;
 - episode/action counters and active provider metadata.
+- `supervision`: last execution receipt, chunk id and reflection verdict, when
+  the supervised bridge is active.
 
 It excludes reward, success before episode end, ground-truth object state, and
 scoring metadata. Never reuse an observation id after a chunk executes.
@@ -50,10 +52,27 @@ may map a normalized gripper scalar according to its existing robot config.
 ## Execution semantics
 
 Creating a chunk never actuates Isaac. `execute_action_chunk` is the only
-actuating tool. It drains that validated chunk until completion or episode end,
-then publishes a fresh observation. A stale/unknown chunk id is rejected.
+actuating tool. With `max_actions=5..10`, it executes at most that many original
+actions, then publishes a fresh observation. With `discard_remaining=true`,
+the unused tail is invalidated and the chunk id is released: the planner must
+observe, replan, and infer a new chunk. Trace and receipts report `executed`,
+`discarded_actions`, `chunk_released`, and the new observation id.
+
+Omitting `max_actions` preserves full-chunk execution for provider-only baselines.
+With `discard_remaining=false`, a caller may explicitly resume the pending tail;
+this is not the normal replanning workflow. A stale/unknown/released chunk id is
+rejected. Neither execution mode changes the provider's numeric action values.
 
 Provider transport may replay a cached response using the same protocol request
 id, but must not redo a stateful inference with a new id. Policy server restart
 or lost temporal state is a provider failure and triggers replan/fallback, not a
 silent reconnect to a fresh model state.
+
+## Reflection handoff
+
+The supervised bridge requires a current three-camera read and
+`reflect_action_chunk(observation_id, chunk_id, verdict, reflection)` after each
+execution window. `continue` permits policy inference; `correct` blocks policy
+inference and permits immediate direct/code takeover; `uncertain` blocks motion.
+An unused tail can never bypass reflection. Native terminal execution closes the
+control server, so its reflection uses saved videos after episode completion.

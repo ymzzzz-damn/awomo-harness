@@ -1,0 +1,90 @@
+{
+  "align_blocks": {
+    "provider_id": "physicalrsi-align-blocks",
+    "action_type": "joint"
+  },
+  "arrange_largest_number_random": {
+    "provider_id": "physicalrsi-arrange-largest-number-random",
+    "action_type": "joint"
+  },
+  "classify_objects": {
+    "provider_id": "physicalrsi-classify-objects",
+    "action_type": "joint"
+  },
+  "classify_objects_by_language": {
+    "provider_id": "physicalrsi-classify-objects-by-language",
+    "action_type": "ee"
+  },
+  "cover_blocks": {
+    "provider_id": "physicalrsi-cover-blocks",
+    "action_type": "joint"
+  },
+  "deposit_coin": {
+    "provider_id": "physicalrsi-deposit-coin",
+    "action_type": "joint"
+  },
+  "general_pickup": {
+    "provider_id": "physicalrsi-general-pickup",
+    "action_type": "joint"
+  },
+  "insert_key": {
+    "provider_id": "physicalrsi-insert-key",
+    "action_type": "ee"
+  },
+  "insert_tubes": {
+    "provider_id": "physicalrsi-insert-tubes",
+    "action_type": "joint"
+  },
+  "make_kong": {
+    "provider_id": "physicalrsi-make-kong",
+    "action_type": "joint"
+  },
+  "play_tic_tac_toe": {
+    "provider_id": "physicalrsi-play-tic-tac-toe",
+    "action_type": "ee"
+  },
+  "plug_in_charger": {
+    "provider_id": "physicalrsi-plug-in-charger",
+    "action_type": "joint"
+  },
+  "pour_balls_into_vase": {
+    "provider_id": "physicalrsi-pour-balls-into-vase",
+    "action_type": "joint"
+  },
+  "pour_by_language": {
+    "provider_id": "physicalrsi-pour-by-language",
+    "action_type": "joint"
+  },
+  "pour_liquid_into_cup": {
+    "provider_id": "physicalrsi-pour-liquid-into-cup",
+    "action_type": "ee"
+  },
+  "press_by_number": {
+    "provider_id": "physicalrsi-press-by-number",
+    "action_type": "ee"
+  },
+  "push_T": {
+    "provider_id": "physicalrsi-push-t",
+    "action_type": "joint"
+  },
+  "solve_equation": {
+    "provider_id": "physicalrsi-solve-equation",
+    "action_type": "joint"
+  },
+  "sort_nesting_dolls_by_size": {
+    "provider_id": "physicalrsi-sort-nesting-dolls-by-size",
+    "action_type": "joint"
+  },
+  "stack_blocks_by_language": {
+    "provider_id": "physicalrsi-stack-blocks-by-language",
+    "action_type": "joint"
+  },
+  "store_tools_in_toolbox": {
+    "provider_id": "physicalrsi-store-tools-in-toolbox",
+    "action_type": "ee"
+  },
+  "swap_T": {
+    "provider_id": "physicalrsi-swap-t",
+    "action_type": "joint"
+  }
+}

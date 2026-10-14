@@ -35,6 +35,32 @@ session；不能在 episode 中把同一 stateful policy client 偷换到另一�
 GPT fallback 不替换 provider registry，它只是同一 session 内受限的第二 action
 source，仍走 embodiment action queue。
 
+## 两条反馈链路
+
+```text
+VLA/WAM chunk -> execute short window -> fresh public RGB/state
+                                            |
+                                   GPT reflection + verdict
+                                   /           |          \\
+                              continue       correct     uncertain
+                                 |              |            |
+                           next VLA/WAM   GPT direct/code   observe/abort
+
+completed task -> videos + native result + chunk reflections + current skill/policy
+                                            |
+                                  LLM diagnosis -> distillation
+                                            |
+                           immutable task skill/code/memory candidate
+                                            |
+                            next development run -> repeat feedback
+                                            |
+                              independent validation -> promotion
+```
+
+新监督 bridge 对 verdict 与下一 controller 的对应关系做强制校验。任务后
+蒸馏可用 `--evolve --rounds N` 自动回流下一 development run。候选与正式版本
+分开；不让 validation/final 反馈进入蒸馏，也不更新模型权重。
+
 ## 进程边界
 
 - `:8088`：awomopaw API 和 agent。

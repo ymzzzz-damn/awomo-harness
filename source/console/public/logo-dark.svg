@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="132" viewBox="0 0 680 132" role="img" aria-label="awomopaw">
+  <g transform="translate(8 8)">
+    <circle cx="54" cy="62" r="46" fill="#ff9d4d"/>
+    <ellipse cx="54" cy="72" rx="25" ry="21" fill="#fff"/>
+    <circle cx="27" cy="42" r="9" fill="#fff"/>
+    <circle cx="44" cy="29" r="10" fill="#fff"/>
+    <circle cx="65" cy="29" r="10" fill="#fff"/>
+    <circle cx="82" cy="43" r="9" fill="#fff"/>
+  </g>
+  <text x="126" y="91" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="104" font-weight="700" letter-spacing="-2">awomopaw</text>
+</svg>

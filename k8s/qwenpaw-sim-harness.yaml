@@ -1,0 +1,235 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qwenpaw-sim-harness
+  namespace: dreamzero-training
+  labels:
+    app.kubernetes.io/name: qwenpaw-sim-harness
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: qwenpaw-sim-harness
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: qwenpaw-sim-harness
+        qwenpaw.openai.com/mode: simulation-only
+    spec:
+      enableServiceLinks: false
+      imagePullSecrets:
+        - name: registry-secret
+      nodeSelector:
+        kubernetes.io/hostname: "192.168.48.153"
+        node.kubernetes.io/cce-instance-type: bcc.lgn7c.c180m890.8gpu
+      tolerations:
+        - key: gpu-type
+          operator: Equal
+          value: "5090"
+          effect: NoSchedule
+      containers:
+        - name: qwenpaw
+          image: registry.d-robotics.cc/auwomo-auwomo/robodojo-tswam-full:20260901-f2@sha256:834a60f7a9e36254b5ac8fc1ec4689b19d9e4eb413836e65812e4047940499a3
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              test -x "${QWENPAW_VENV_ROOT}/bin/qwenpaw"
+              test -d "${ROBODOJO_ROOT}"
+              # The cluster image's RoboDojo eval environment lacks PyYAML,
+              # although both the client bootstrap and RoboDojo runtime import
+              # it. Reuse only QwenPaw's validated pure-Python yaml package;
+              # do not prepend the entire QwenPaw site-packages tree to Isaac's
+              # environment because that could shadow simulator dependencies.
+              mkdir -p /runtime/python-compat
+              qwenpaw_yaml_dir="$(
+                "${QWENPAW_VENV_ROOT}/bin/python" -c \
+                  'from pathlib import Path; import yaml; print(Path(yaml.__file__).parent)'
+              )"
+              ln -sfn "${qwenpaw_yaml_dir}" /runtime/python-compat/yaml
+              # The dependency layer is reusable; PYTHONPATH pins execution to
+              # this immutable release's QwenPaw and embodiment source.
+              export PYTHONPATH="/runtime/python-compat:${RELEASE_ROOT}/source/src:${RELEASE_ROOT}/source${PYTHONPATH:+:${PYTHONPATH}}"
+              cp -a "${RELEASE_ROOT}/robodojo-overlay/." "${ROBODOJO_ROOT}/"
+              link_shared_dir() {
+                local target=$1
+                local link=$2
+                test -d "${target}"
+                mkdir -p "$(dirname "${link}")"
+                if [[ -L "${link}" ]]; then
+                  ln -sfn "${target}" "${link}"
+                  return
+                fi
+                if [[ -e "${link}" ]]; then
+                  if [[ -d "${link}" ]] && [[ -z "$(find "${link}" -mindepth 1 -print -quit)" ]]; then
+                    rmdir "${link}"
+                  else
+                    echo "Refusing to replace non-empty path: ${link}" >&2
+                    exit 1
+                  fi
+                fi
+                ln -s "${target}" "${link}"
+              }
+              link_shared_dir "${ROBODOJO_ASSETS_ROOT}" "${ROBODOJO_ROOT}/Assets"
+              # Several upstream RoboDojo/CuRobo robot configs were authored
+              # with the original checkout's absolute path. Keep the release
+              # relocatable by providing one compatibility alias for the
+              # complete checkout instead of rewriting benchmark data.
+              link_shared_dir "${ROBODOJO_ROOT}" "/personal/Web/RoboDojo"
+              mkdir -p "${ROBODOJO_ROOT}/XPolicyLab/policy/Pi_05/checkpoints"
+              link_shared_dir \
+                "${ROBODOJO_PI05_CHECKPOINTS_ROOT}/RoboDojo-sim-arx_x5-joint-0" \
+                "${ROBODOJO_ROOT}/XPolicyLab/policy/Pi_05/checkpoints/RoboDojo-sim-arx_x5-joint-0"
+              # The validated uv environment was built at this absolute local
+              # path. Recreate its source alias and CPython home inside the pod
+              # so activate scripts and editable .pth entries remain valid.
+              link_shared_dir "${ROBODOJO_PI05_RUNTIME}" \
+                "/home/ymz/robodojo-pi05/RoboDojo/XPolicyLab/policy/Pi_05/openpi"
+              mkdir -p /home/ymz/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/bin
+              ln -sfn /opt/conda/envs/RoboDojo/bin/python \
+                /home/ymz/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/bin/python3.11
+              test -x "${ROBODOJO_PI05_RUNTIME}/.venv/bin/python"
+              "${QWENPAW_VENV_ROOT}/bin/python" "${RELEASE_ROOT}/runtime/bootstrap_runtime.py" \
+                --release-root "${RELEASE_ROOT}" \
+                --bridge-url "${ROBODOJO_SIM_BRIDGE_URL}"
+              "${QWENPAW_VENV_ROOT}/bin/python" \
+                "${RELEASE_ROOT}/runtime/supervision/supervised_bridge.py" \
+                --port 8098 &
+              bridge_pid=$!
+              for _ in $(seq 1 30); do
+                if "${QWENPAW_VENV_ROOT}/bin/python" -c \
+                  'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8098/health", timeout=2)' \
+                  >/dev/null 2>&1; then
+                  break
+                fi
+                sleep 1
+              done
+              kill -0 "${bridge_pid}"
+              exec "${QWENPAW_VENV_ROOT}/bin/qwenpaw" app --host 0.0.0.0 --port 8088 --log-level info
+          env:
+            - name: RELEASE_ROOT
+              value: __RELEASE_ROOT__
+            - name: QWENPAW_VENV_ROOT
+              value: __VENV_ROOT__
+            - name: ROBODOJO_SIM_BRIDGE_URL
+              value: http://127.0.0.1:8098
+            - name: ROBODOJO_ROOT
+              value: /opt/robodojo
+            - name: ROBODOJO_HARNESS_POLICY_DIR
+              value: XPolicyLab/policy/Awomopaw_Harness
+            - name: ROBODOJO_HARNESS_POLICY_NAME
+              value: Awomopaw_Harness
+            - name: ROBODOJO_HARNESS_STATE_DIR
+              value: /runtime/robodojo-harness
+            - name: ROBODOJO_ASSETS_ROOT
+              value: /mnt/auwomo-data/auwomo-datasets/raw-data/manipulation/RoboDojo/Assets
+            - name: ROBODOJO_PI05_CHECKPOINTS_ROOT
+              value: /mnt/auwomo-data/auwomo-datasets/raw-data/manipulation/RoboDojo/ckpt/RoboDojo/Pi_05
+            - name: ROBODOJO_PI05_RUNTIME
+              value: /mnt/auwomo-data/wangxin/qwenpaw-harness/providers/Pi_05/openpi
+            - name: ROBODOJO_POLICY_REGISTRY_JSON
+              value: >-
+                [{"provider_id":"pi05","kind":"vla","policy_name":"Pi_05","checkpoint":"RoboDojo-sim-arx_x5-joint-0","policy_uv_env_path":"/mnt/auwomo-data/wangxin/qwenpaw-harness/providers/Pi_05/openpi","revision":"checkpoint:RoboDojo-sim-arx_x5-joint-0:59999"}]
+            - name: QWENPAW_MODEL
+              value: gpt-6-astra
+            - name: QWENPAW_WORKING_DIR
+              value: /runtime/qwenpaw
+            - name: QWENPAW_SECRET_DIR
+              value: /runtime/qwenpaw.secret
+            - name: QWENPAW_RUNNING_IN_CONTAINER
+              value: "true"
+            - name: QWENPAW_CHANNEL_ALLOWLIST
+              value: console
+            # The P6000 admission policy allocates the 5090 node only as an
+            # 8-GPU unit. Keep the workload itself on one logical device.
+            - name: CUDA_VISIBLE_DEVICES
+              value: "0"
+          envFrom:
+            - secretRef:
+                name: qwenpaw-harness-api
+          ports:
+            - name: http
+              containerPort: 8088
+          startupProbe:
+            httpGet:
+              path: /api/version
+              port: http
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              # This route requires the default workspace to be available, so
+              # dependency failures hidden behind the version route keep the
+              # Pod out of Service endpoints.
+              path: /api/embodiments
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /api/version
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: "4"
+              memory: 16Gi
+              nvidia.com/gpu: "8"
+            limits:
+              cpu: "16"
+              memory: 64Gi
+              nvidia.com/gpu: "8"
+          volumeMounts:
+            - name: shared-data
+              mountPath: /mnt/auwomo-data
+              readOnly: true
+            # Isaac Sim 5.1's Python package image omits this extension and
+            # otherwise tries to download it from CloudFront at episode start.
+            # Pin the byte-identical cache exported from the validated local
+            # Isaac runtime so evaluation does not depend on public egress.
+            - name: shared-data
+              mountPath: /root/.local/share/ov/data/exts/v2/omni.kit.pip_archive-d38fa9ecd1fb6df4
+              subPath: wangxin/qwenpaw-harness/isaac-cache/exts/v2/omni.kit.pip_archive-d38fa9ecd1fb6df4
+              readOnly: true
+            # Official scores, traces, and camera videos must survive Pod
+            # replacement so the same artifacts can be used for evaluation
+            # review and leaderboard submission.
+            - name: eval-result
+              mountPath: /opt/robodojo/eval_result
+            - name: runtime
+              mountPath: /runtime
+      volumes:
+        - name: shared-data
+          hostPath:
+            path: /mnt/auwomo-data
+            type: Directory
+        - name: eval-result
+          hostPath:
+            path: /mnt/auwomo-data/wangxin/qwenpaw-harness/eval_result
+            type: DirectoryOrCreate
+        - name: runtime
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qwenpaw-sim-harness
+  namespace: dreamzero-training
+  labels:
+    app.kubernetes.io/name: qwenpaw-sim-harness
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: qwenpaw-sim-harness
+  ports:
+    - name: http
+      port: 8088
+      targetPort: http
+
