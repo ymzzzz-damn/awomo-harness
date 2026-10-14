@@ -1,1 +1,0 @@
-export { MCPClientCard } from "./MCPClientCard";

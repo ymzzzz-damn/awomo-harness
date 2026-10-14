@@ -83,11 +83,11 @@ def validate_memory(memory, experiment, next_layout):
 
 
 
-def learning_eligibility(case_dir):
+def learning_eligibility(case_dir, *, allow_success=False):
     """Deployment errors cannot become task lessons; IK/planning failures can."""
     case_dir = Path(case_dir)
     row = json.loads((case_dir/'receipt.json').read_text())
-    if not row.get('valid_episode') or row.get('success') is not False:
+    if not row.get('valid_episode') or type(row.get('success')) is not bool or (row['success'] and not allow_success):
         return {'eligible': False, 'infrastructure_error': False, 'reason': 'Not an officially scored failure'}
     raw_tools = []
     path = case_dir/'agent-messages.jsonl'
@@ -109,7 +109,8 @@ def learning_eligibility(case_dir):
     actions = max((e.get('action_count',0) for e in traces), default=0)
     if actions == 0:
         return {'eligible': False, 'infrastructure_error': False, 'reason': 'No executed motion; no physical task lesson', 'actual_actions': 0}
-    return {'eligible': True, 'infrastructure_error': False, 'reason': 'Executed manipulation with official failure', 'actual_actions': actions}
+    return {'eligible': True, 'infrastructure_error': False,
+            'reason': 'Executed manipulation with official ' + ('success' if row['success'] else 'failure'), 'actual_actions': actions}
 
 
 def working_memory_view(memory):
@@ -119,6 +120,9 @@ def working_memory_view(memory):
             'task_memory': memory.get('task_memory',''),
             'lesson_ids': [{'id': l['id'], 'source_layout_id': l['source_layout_id'],
                             'summary': l['text'][:180]} for l in memory.get('active_lessons',[])]}
+    if memory.get('schema') == 'awomopaw.task-experience/v2':
+        view.update(task=memory['task'], task_artifact=memory.get('task_artifact'),
+                    successful_source_layouts=[e['source_layout_id'] for e in memory['entries'] if e['official_success']])
     rendered = json.dumps(view, ensure_ascii=False, indent=2)
     if len(rendered) > 14000:
         raise ValueError('Working memory view exceeds tool output safety margin')
@@ -164,16 +168,17 @@ def select_indices(count):
     return sorted({round((count - 1) * fraction) for fraction in [0, .25, .5, .75, 1]})
 
 
-def failure_evidence(case_dir):
+def failure_evidence(case_dir, *, allow_success=False, output=None):
     case_dir = Path(case_dir)
     receipt = json.loads((case_dir/'receipt.json').read_text())
-    if not receipt.get('valid_episode') or receipt.get('success') is not False:
+    if not receipt.get('valid_episode') or type(receipt.get('success')) is not bool or (receipt['success'] and not allow_success):
         raise ValueError('Only an officially scored failure can generate experience')
-    out = case_dir/'learning'
+    out = Path(output) if output is not None else case_dir/'learning'
     frames = []
     videos = json.loads((case_dir/'videos.json').read_text())
     if len(videos) != 3:
         raise ValueError('Three failure camera videos required')
+    seen_cameras = set()
     for video in videos:
         path = case_dir/'videos'/Path(video['path']).name
         if digest(path) != video['sha256']:
@@ -183,6 +188,16 @@ def failure_evidence(case_dir):
             raise ValueError('Empty failure video')
         indices = select_indices(count)
         camera = next(c for c in ['cam_head', 'cam_left_wrist', 'cam_right_wrist'] if c in path.name)
+        if camera in seen_cameras:
+            raise ValueError('Duplicate camera video')
+        seen_cameras.add(camera)
+        timestamps = None
+        if allow_success:
+            probe = subprocess.check_output(['ffprobe', '-v', 'error', '-select_streams', 'v:0',
+                '-show_entries', 'frame=best_effort_timestamp_time', '-of', 'json', str(path)], timeout=90)
+            timestamps = [float(f['best_effort_timestamp_time']) for f in json.loads(probe)['frames']]
+            if len(timestamps) != count:
+                raise ValueError('Video timestamp/frame count mismatch')
         folder = out/'frames'/camera
         folder.mkdir(parents=True, exist_ok=True)
         selection = '+'.join(f'eq(n\\,{i})' for i in indices)
@@ -195,6 +210,8 @@ def failure_evidence(case_dir):
         for index, image in zip(indices, decoded):
             frames.append({'id': f'{camera}:{index}', 'path': str(image), 'sha256': digest(image),
                            'camera': camera, 'frame_index': index, 'video_sha256': video['sha256']})
+            if timestamps is not None:
+                frames[-1]['timestamp_seconds'] = timestamps[index]
     trace = [json.loads(line) for line in (case_dir/'harness-trace.jsonl').read_text().splitlines()]
     # Whitelist public execution metadata, never pass arbitrary simulator state.
     keys = {'event','time','action_count','executed','source','subtask_goal','planning_summary',
@@ -230,7 +247,7 @@ def failure_evidence(case_dir):
     public_observation = json.loads((case_dir/'initial-observation.json').read_text())
     evidence = {'layout_id': receipt['layout_id'], 'run_id': receipt['run_id'],
                 'official_instruction': public_observation['instruction'],
-                'terminal_result': {'success': False, 'score': receipt['score']},
+                'terminal_result': {'success': receipt['success'], 'score': receipt['score']},
                 'trace_sha256': digest(case_dir/'harness-trace.jsonl'),
                 'event_counts': dict(Counter(e.get('event') for e in trace)),
                 'trajectory_samples': [{k: v for k, v in e.items() if k in keys} for e in selected],

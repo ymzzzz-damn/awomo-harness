@@ -4,12 +4,16 @@ import argparse
 from dataclasses import replace
 import json
 import hashlib
+import os
 from pathlib import Path
 import sys
 import time
 import re
 from datetime import datetime, timezone
 import uvicorn
+from fastapi import HTTPException
+from subtask_supervisor import SubtaskSupervisor
+from supervised_bridge import ReflectionRequest
 from chat_eval_bridge import FixtureManager
 from qwenpaw.app.embodiments.robodojo_adapter import (
     RoboDojoAdapterConfig, PolicyProvider, AdapterConfigurationError, create_app,
@@ -34,12 +38,67 @@ class GPT6AblationManager(FixtureManager):
         self.policy_port=policy_port
         self.started=False
         self.started_at=None
+        settings=json.loads(self.fixture.read_text()).get('subtask_supervision')
+        self.subtask_gate=SubtaskSupervisor() if settings else None
+        self.segment_actions=settings['max_actions'] if settings else None
+        if settings:
+            if type(self.segment_actions) is not int or not 10 <= self.segment_actions <= 100:
+                raise ValueError('Subtask action segment must be 10..100')
+            runtime,_=self._code_runtime()
+            if ('awomopaw.subtask-boundary/v1' not in (runtime/'worker.py').read_text() or
+                    os.environ.get('ROBODOJO_SUBTASK_MAX_ACTIONS')!=str(self.segment_actions)):
+                raise ValueError('Subtask supervision requires the bounded worker and matching action cap')
 
     def health(self):
         result=super().health()
         result.update(planning_handoff='GPT6 authors every action directly through the harness',
                       execution_modes=['interactive','gpt6_direct_joint','gpt6_generated_code'],vla_used=False)
+        if self.subtask_gate:
+            result['subtask_supervision']={'required':True,'max_actions':self.segment_actions,
+                'phase':'subtask_return_or_action_segment','model_calls_per_joint_action':0}
         return result
+
+    def _sync_subtask(self, obs):
+        gate=getattr(self, 'subtask_gate', None)
+        if not gate:return
+        gate.bind(obs)
+        if gate.active and gate.active.startswith('code-') and not self.code_policy_running():
+            status=super().code_policy_status(gate.active)
+            if status['status']!='running':gate.completed(gate.active,status,obs)
+
+    def current_observation(self):
+        obs=super().current_observation()
+        self._sync_subtask(obs)
+        if getattr(self,'subtask_gate',None):
+            return {**obs,'subtask_supervision':self.subtask_gate.public()}
+        return obs
+
+    def current_observation_image(self, topic):
+        with self._lock:
+            obs=self.current_observation()
+            pixels,kind=super().current_observation_image(topic)
+            if getattr(self,'subtask_gate',None):self.subtask_gate.frame(obs,topic,pixels)
+            return pixels,kind
+
+    def reflect_subtask(self, payload):
+        with self._lock:
+            value=self.subtask_gate.review(payload,self.current_observation())
+            output=Path(json.loads(self.fixture.read_text())['output'])/'subtask-reflections.jsonl'
+            with output.open('a') as stream:stream.write(json.dumps(value,ensure_ascii=False)+'\n')
+            return value
+
+    def _require_subtask_review(self):
+        if getattr(self,'subtask_gate',None):self.subtask_gate.require(self.current_observation())
+
+    def code_policy_api(self):
+        api=super().code_policy_api()
+        if getattr(self,'subtask_gate',None):
+            api={**api,'subtask_supervision':dict(max_actions=self.segment_actions,
+                instruction='Write one subtask per worker. Record the active primitive in memory; '
+                'mark completion only after it returns. A cutoff means partial progress. '
+                'A supervision_boundary return pauses motion without ending the episode; reobserve, '
+                'reflect, then generate the remaining subtask from current state. Do not restart completed motion.')}
+        return api
 
     def start_attempt(self, **kwargs):
         if self.started:
@@ -100,6 +159,19 @@ class GPT6AblationManager(FixtureManager):
             if not any(r.get('sha256')==expected and Path(r['path']).resolve()==snapshot.resolve() and
                        (not fixture.get('complete_experience_view_required') or r.get('complete_working_memory') is True) for r in reads):
                 raise ValueError('Read learned experience before first motion')
+            if fixture.get('task_artifact'):
+                from gpt6_task_learning import load_task_artifact
+                knowledge=json.loads(snapshot.read_text())
+                if knowledge.get('task_artifact')!=fixture['task_artifact']:
+                    raise ValueError('Skill fixture differs from the frozen experience')
+                artifact=load_task_artifact(fixture['task_artifact'],fixture['task'])
+                path=Path(fixture['output'])/'skill-reads.json'
+                reads=json.loads(path.read_text()) if path.exists() else []
+                for name in ['SKILL.md','memory.json','task-artifact.json']:
+                    target=(artifact['directory']/name).resolve()
+                    if not any(Path(r['path']).resolve()==target and r.get('sha256')==hashlib.sha256(target.read_bytes()).hexdigest()
+                               and r.get('complete_file') is True for r in reads):
+                        raise ValueError('Read complete learned skill, memory and artifact before first motion')
 
     def record_experience_application(self, payload, result, kind):
         fixture=json.loads(self.fixture.read_text())
@@ -118,13 +190,28 @@ class GPT6AblationManager(FixtureManager):
 
     def submit_direct_action_chunk(self, payload):
         self.require_skill_reads()
+        worker_running=self.code_policy_running()
+        if not worker_running:self._require_subtask_review()
         result=super().submit_direct_action_chunk(payload)
+        if getattr(self,'subtask_gate',None) and not worker_running:
+            self.subtask_gate.start(result['chunk_id'],self.current_observation())
         self.record_experience_application(payload,result,'direct_action')
+        return result
+
+    def execute_action_chunk(self, chunk_id, max_actions=None, discard_remaining=False):
+        worker_running=self.code_policy_running()
+        result=super().execute_action_chunk(chunk_id,max_actions,discard_remaining)
+        if getattr(self,'subtask_gate',None) and not worker_running and not result.get('episode_end'):
+            self.subtask_gate.completed(chunk_id,result,self.current_observation())
         return result
 
     def start_code_policy(self, payload):
         self.require_skill_reads()
+        self._require_subtask_review()
+        initial=super().current_observation() if getattr(self,'subtask_gate',None) else None
         result=super().start_code_policy(payload)
+        if getattr(self,'subtask_gate',None):
+            self.subtask_gate.start(result['policy_id'],initial)
         self.record_experience_application(payload,result,'generated_code')
         return result
 
@@ -148,6 +235,12 @@ def main():
     config=replace(config,providers=(provider,))
     manager=GPT6AblationManager(config,args.fixture,args.policy_port)
     app=create_app(manager=manager)
+    if getattr(manager,'subtask_gate',None):
+        @app.post('/v1/sessions/reflections')
+        def reflect(request: ReflectionRequest):
+            try:return manager.reflect_subtask(request.model_dump())
+            except (ValueError,AdapterConfigurationError) as error:
+                raise HTTPException(status_code=409,detail=str(error)) from error
     try:
         uvicorn.run(app,host='127.0.0.1',port=args.port)
     finally:

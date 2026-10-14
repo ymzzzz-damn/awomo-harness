@@ -5,6 +5,7 @@ import hashlib
 import io
 import json
 import math
+import os
 from pathlib import Path
 import sys
 import time
@@ -16,11 +17,19 @@ import numpy as np
 from PIL import Image
 
 from contract import validate_source
-from bridge import PrimitiveClient, Robot, Sam3TextSegmenter, plain
+import importlib
+primitives = importlib.import_module(os.environ.get("ROBODOJO_PRIMITIVES_MODULE", "awomopaw_primitives"))
+PrimitiveClient, Robot = primitives.PrimitiveClient, primitives.Robot
+Sam3TextSegmenter, plain = primitives.Sam3TextSegmenter, primitives.plain
 
+BOUNDARY_PROTOCOL = 'awomopaw.subtask-boundary/v1'
 
 class EpisodeFinished(BaseException):
     pass
+
+
+class SupervisionBoundary(BaseException):
+    """Pause this worker for GPT review; the native episode remains live."""
 
 
 class HttpEpisode:
@@ -40,6 +49,11 @@ class HttpEpisode:
         self.target = {k: np.asarray(v, dtype=float) for k, v in self.obs["state"].items()
                        if k.endswith(("_arm_joint_state", "_ee_joint_state"))}
         self.maximum_actions = min(175, self.public["action_limit"] - self.public["action_count"])
+        self.supervision_limit = int(os.environ.get('ROBODOJO_SUBTASK_MAX_ACTIONS', '0'))
+        if self.supervision_limit:
+            if not 1 <= self.supervision_limit <= 200:
+                raise ValueError('ROBODOJO_SUBTASK_MAX_ACTIONS must be 1..200')
+            self.maximum_actions = min(self.maximum_actions, self.supervision_limit)
         if self.maximum_actions <= 0:
             raise ValueError("episode has no remaining action budget")
         self.record("code_policy_started", instruction=self.instruction, initial_state=self.initial,
@@ -81,6 +95,9 @@ class HttpEpisode:
 
     def emit(self, action):
         if self.steps >= self.maximum_actions:
+            if self.supervision_limit:
+                self.record('supervision_boundary', reason='action_segment_limit')
+                raise SupervisionBoundary()
             raise RuntimeError("code policy action budget exhausted")
         action = plain(action)
         chunk = self.request("/v1/sessions/direct-action-chunks", {
@@ -150,7 +167,7 @@ class Backend:
     def __init__(self):
         self.robot = Robot()
         self.segmenter = Sam3TextSegmenter()
-        calibration = json.loads((Path(__file__).resolve().parents[1] / "physicalrsi-evolution/generic_tools/head_camera.json").read_text())
+        calibration = json.loads(Path(os.environ["ROBODOJO_CAMERA_CALIBRATION"]).read_text())
         self.K = np.asarray(calibration["K"])
         self.T = np.asarray(calibration["T"])
 
@@ -170,6 +187,7 @@ def main():
     source = Path(config["source"]).read_text()
     validate_source(source)
     episode = None
+    memory = config.get("memory", {})
     try:
         episode = HttpEpisode(config)
         episode.image()
@@ -177,7 +195,6 @@ def main():
         allowed = ("abs", "min", "max", "sum", "len", "range", "enumerate", "zip", "sorted", "list", "dict", "tuple", "float", "int", "str", "bool", "round", "all", "any", "Exception", "ValueError")
         namespace = {"__builtins__": {n: getattr(builtins, n) for n in allowed}}
         exec(compile(source, config["source"], "exec"), namespace)
-        memory = config.get("memory", {})
         namespace["policy"](HttpRobot(episode), memory)
         episode.record("policy_returned", memory=memory)
         status["memory"] = memory
@@ -187,11 +204,14 @@ def main():
         status["status"] = "returned"
     except EpisodeFinished:
         status["status"] = "episode_terminal"
+    except SupervisionBoundary:
+        status.update(status='supervision_boundary', reason='Review current RGB before continuing the subtask')
     except BaseException as error:
         status.update(status="error", error=f"{type(error).__name__}: {error}", traceback=traceback.format_exc())
         if episode:
             episode.record("policy_error", **status)
     finally:
+        status['memory'] = memory
         status.update(finished_at=time.time(), executed_actions=episode.steps if episode else 0,
                       source_sha256=hashlib.sha256(source.encode()).hexdigest())
         (output / "worker-status.json").write_text(json.dumps(status, indent=2) + "\n")

@@ -41,8 +41,9 @@ def test_code_actions_use_fresh_observation_and_preserve_episode_origin(tmp_path
     fake_bridge.Robot = object
     fake_bridge.Sam3TextSegmenter = object
     fake_bridge.plain = lambda x: x
-    monkeypatch.setitem(sys.modules, "bridge", fake_bridge)
+    monkeypatch.setitem(sys.modules, "awomopaw_primitives", fake_bridge)
     monkeypatch.setitem(sys.modules, "contract", contract)
+    monkeypatch.setitem(sys.modules, "cv2", ModuleType("cv2"))
     worker = load("test_http_code_worker", RUNTIME / "worker.py")
     source = tmp_path / "policy.py"
     source.write_text("def policy(robot, memory):\n    return None\n")

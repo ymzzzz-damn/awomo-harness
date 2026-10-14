@@ -142,7 +142,7 @@ def test_frozen_code_provider_uses_manifest_not_fake_vla_weights(tmp_path: Path)
     directory.mkdir()
     (directory / 'model.py').write_text('class Model: pass\n')
     descriptor = tmp_path / 'descriptor.json'
-    descriptor.write_text('{"schema":"physicalrsi.skill-worker/v1"}\n')
+    descriptor.write_text('{"schema":"awomopaw.test-worker/v1"}\n')
     (directory / 'frozen-skill.json').write_text(json.dumps({
         'schema': 'awomopaw.frozen-skill/v1', 'release_id': 'frozen-v1',
         'descriptor': str(descriptor),
@@ -329,6 +329,11 @@ def test_code_worker_pins_official_goal_origin_and_qualified_environment(tmp_pat
         "initial_robot_state": origin,
     }
     manager.get_run = lambda run_id: SimpleNamespace(run_id=run_id, artifact_dir=str(tmp_path / "native"))
+    primitives = tmp_path / 'primitives'
+    primitives.mkdir()
+    monkeypatch.setenv('ROBODOJO_PRIMITIVES_PATH', str(primitives))
+    monkeypatch.setenv('ROBODOJO_CODE_POLICY_PYTHON', '/configured/bin/python')
+    monkeypatch.setenv('MODEL_API_KEY', 'test-secret')
     captures = []
     def spawn(cmd, **kwargs):
         captures.append((cmd, kwargs))
@@ -340,9 +345,10 @@ def test_code_worker_pins_official_goal_origin_and_qualified_environment(tmp_pat
     config = json.loads((Path(job["artifact_dir"]) / "worker-config.json").read_text())
     assert config["instruction"] == "Benchmark instruction"
     assert config["initial_state"] == origin
-    assert captures[0][0][0].endswith("implementations/openpi/.venv/bin/python")
-    assert "dependencies/sam3/285ae50fdaf8a2b7/sam3" in captures[0][1]["env"]["PYTHONPATH"]
-    assert "implementations/align_blocks_rgb" not in captures[0][1]["env"]["PYTHONPATH"]
+    assert captures[0][0][0] == '/configured/bin/python'
+    assert captures[0][1]['env']['PYTHONPATH'].split(__import__('os').pathsep)[-1] == str(primitives)
+    assert 'physicalrsi' not in captures[0][1]['env']['PYTHONPATH'].lower()
+    assert 'MODEL_API_KEY' not in captures[0][1]['env']
 
 
 def test_execution_environment_recovers_conda_for_service_process(

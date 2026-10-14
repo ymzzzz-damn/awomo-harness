@@ -51,15 +51,7 @@ trace, and episode limits.
 
 ## Provider boundary
 
-An explicit user request to reuse an installed, frozen task skill may select a
-ready provider with `kind=code`. For the local `physicalrsi-align` provider, use
-the `physicalrsi-align-blocks` skill and canonical task `align_blocks`; pass the
-unaltered benchmark instruction to `request_policy_chunk` and execute through
-the same queue. The published program returns one action per observation: do
-not pad it to five or ten actions or repeat old actions. This is reuse of an
-existing task-specific program, not a newly LLM-generated fallback. It does not
-replace the default VLA/WAM planning workflow. Preserve its release revision,
-official score and all three camera videos, and report only scored episodes.
+Only explicitly registered external providers are available. Learned AwomoPaw skills are loaded through their versioned task artifacts.
 
 `policy_id` resolves through the server-side registry. Pi0.5 is the initial
 provider; later VLA/WAM adapters register the same observation-to-action-chunk

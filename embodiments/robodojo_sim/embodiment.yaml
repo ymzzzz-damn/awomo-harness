@@ -139,7 +139,7 @@ registry:
             execution: {timeout_seconds: 15, topic: cam_right_wrist}
 
           - operation_id: reflect_action_chunk
-            description: Submit LLM reflection after each executed window, using fresh public RGB. Continue permits VLA/WAM; correct permits immediate GPT takeover; uncertain blocks motion. Requires the supervised bridge advertised by health.
+            description: Submit visual reflection using current RGB and the last execution receipt. For subtask_supervision use its chunk_id (code policy id), review once per completed subtask or action segment; continue permits the next GPT subtask and correct requires revision. For chunk_supervision continue permits VLA/WAM and correct permits GPT takeover. Uncertain blocks motion. Terminal segments use offline video review.
             method: POST
             path: /v1/sessions/reflections
             input_schema:

@@ -63,21 +63,17 @@ class CodePolicyManagerMixin:
             }
             config_path = output / "worker-config.json"
             config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n")
-            generic = runtime.parent / "physicalrsi-evolution"
-            assets = Path(os.environ.get("ROBODOJO_CODE_ASSETS", "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/code-skills"))
-            dependency_spec = json.loads((runtime / "dependencies.json").read_text())
-            relative_dependencies = dependency_spec["pythonpath"]
-            if any(not p.startswith("dependencies/") or ".." in Path(p).parts for p in relative_dependencies):
-                raise ValueError("code runtime may expose generic dependency directories only")
-            dependencies = [str(assets / p) for p in relative_dependencies]
+            primitives_path = Path(os.environ["ROBODOJO_PRIMITIVES_PATH"]).resolve()
+            if not primitives_path.is_dir():
+                raise ValueError("Configured primitive provider directory is unavailable")
+            python = os.environ["ROBODOJO_CODE_POLICY_PYTHON"]
             env = os.environ.copy()
             for key in list(env):
-                if "API_KEY" in key or key == "PHYSICALRSI_SKILL_CONFIG":
+                if "API_KEY" in key:
                     env.pop(key)
-            env.update(PYTHONPATH=os.pathsep.join([str(runtime), str(generic), str(runtime.parents[1] / "PhysicalRSI"), *dependencies]),
+            env.update(PYTHONPATH=os.pathsep.join([str(runtime), str(primitives_path)]),
                        PYTHONUNBUFFERED="1", OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1", MKL_NUM_THREADS="1",
                        CUDA_VISIBLE_DEVICES=str(self.config.policy_gpu))
-            python = os.environ.get("ROBODOJO_CODE_POLICY_PYTHON", "/data/ymz/physicalrsi-reproduction/skill-assets/implementations/openpi/.venv/bin/python")
             with (output / "worker.log").open("ab", buffering=0) as log:
                 process = subprocess.Popen([python, str(runtime / "worker.py"), str(config_path)],
                                            env=env, cwd=str(runtime), stdout=log, stderr=subprocess.STDOUT,
