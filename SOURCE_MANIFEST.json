@@ -30,8 +30,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "e489738f5d8327e2bc0ae6400ef27641679ff622155850534ffb21fb4bdffc1e",
-      "bytes": 3139
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
     },
     {
       "path": "docs/ownership.json",
@@ -315,13 +315,13 @@
     },
     {
       "path": "source/embodiments/packages/robodojo_sim/EMBODIMENT.md",
-      "sha256": "706c14a9f8878b58523a20d743f6ba171ab8baafd1276b8f79d5878e825fd75f",
-      "bytes": 6016
+      "sha256": "e0d494de97ec8d1c23d9add18990f0a869b16a4e5b7b1d44478c0c4085cf85e7",
+      "bytes": 6085
     },
     {
       "path": "source/embodiments/packages/robodojo_sim/embodiment.yaml",
-      "sha256": "81422de826fdce7e4ae0253b980b26bc647accf4dec9a9d40eae58ab01da0cb1",
-      "bytes": 16476
+      "sha256": "08eb423b858a12a29e41cfc1497c4ae64998df3911a048faa0e3f46157e92ebf",
+      "bytes": 15383
     },
     {
       "path": "source/embodiments/pyproject.toml",
@@ -528,5 +528,18 @@
       "sha256": "d2c5d4273231def026144f64c1cb6ac36a4b6c8c149d78df7a0adf2e549b0863",
       "bytes": 14891
     }
-  ]
+  ],
+  "awomopaw_source_snapshot": {
+    "host": "P6000",
+    "directory": "/mnt/auwomo-data/wangxin/qwenpaw-harness/workspace/awomopaw",
+    "stage": "pre-experiment workspace",
+    "scope": "AwomoPaw framework only; no experiment runtime fixes or RoboDojo evaluation changes",
+    "source_files": 141,
+    "source_index_sha256": "905c831529bd9bd85eb3484858ca5972bd2947e21dc21960fec5e6f4a01b9ece",
+    "packaging_adaptations": {
+      "embodiments/pyproject.toml": "Preserve the published simulation-only package metadata; hardware builders are not vendored.",
+      "src/qwenpaw/app/embodiments/code_policy_runtime.py": "Preserve the existing explicit external primitive-provider configuration instead of private deployment dependency paths.",
+      "tests/unit/agents/test_robodojo_adapter.py": "Preserve the matching external primitive-provider fixtures and public descriptor schema."
+    }
+  }
 }

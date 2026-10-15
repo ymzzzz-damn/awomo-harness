@@ -1,7 +1,7 @@
 schema: embodiment_package/v3
 package_id: robodojo_sim
 name: RoboDojo Isaac Simulation Embodiment
-version: 0.8.0
+version: 0.7.0
 kind: embodiment_context
 license: Apache-2.0
 summary: Unified observation and action boundary for planner, VLA/WAM, and GPT fallback in RoboDojo.
@@ -22,7 +22,6 @@ capabilities:
   - {id: run_code_policy, class: simulation, verified: interface_only}
   - {id: code_policy_status, class: safe, verified: interface_only}
   - {id: execute_action_chunk, class: simulation, verified: interface_only}
-  - {id: reflect_action_chunk, class: safe, verified: interface_only}
   - {id: abort_session, class: simulation, verified: interface_only}
   - {id: start_evaluation, class: simulation, verified: interface_only}
   - {id: current_evaluation, class: safe, verified: interface_only}
@@ -59,7 +58,7 @@ registry:
       participant_type: software_node
       role: robodojo_sim_api
       real_device: false
-      safe_capabilities: [health, session_status, current_observation, capture_head_frame, capture_left_wrist_frame, capture_right_wrist_frame, reflect_action_chunk, code_policy_api, code_policy_status, current_evaluation, evaluation_status, evaluation_result]
+      safe_capabilities: [health, session_status, current_observation, capture_head_frame, capture_left_wrist_frame, capture_right_wrist_frame, code_policy_api, code_policy_status, current_evaluation, evaluation_status, evaluation_result]
       limits:
         environment: simulation
         loopback_only: true
@@ -137,22 +136,6 @@ registry:
             input_schema: {type: object, properties: {}, additionalProperties: false}
             safety_class: safe
             execution: {timeout_seconds: 15, topic: cam_right_wrist}
-
-          - operation_id: reflect_action_chunk
-            description: Submit LLM reflection after each executed window, using fresh public RGB. Continue permits VLA/WAM; correct permits immediate GPT takeover; uncertain blocks motion. Requires the supervised bridge advertised by health.
-            method: POST
-            path: /v1/sessions/reflections
-            input_schema:
-              type: object
-              properties:
-                observation_id: {type: string, minLength: 8, maxLength: 64}
-                chunk_id: {type: string, minLength: 8, maxLength: 64}
-                verdict: {type: string, enum: [continue, correct, uncertain]}
-                reflection: {type: string, minLength: 1, maxLength: 4000}
-              required: [observation_id, chunk_id, verdict, reflection]
-              additionalProperties: false
-            safety_class: safe
-            execution: {timeout_seconds: 15}
 
           - operation_id: request_policy_chunk
             description: Send the current observation and planner subtask to the active registered VLA/WAM; returns a validated unexecuted chunk id.
@@ -316,7 +299,7 @@ graphs:
   - schema: embodiment_graph/v2
     graph_id: robodojo_hybrid_policy_sim
     name: GPT planner with pluggable VLA/WAM and GPT action fallback
-    intent: Reflect after each execution window, continue the registered policy on progress, and immediately transfer control to GPT on clear deviation through one RoboDojo/Isaac boundary.
+    intent: Plan subtasks, prefer a registered policy, and execute every action through one RoboDojo/Isaac embodiment boundary.
     safety_level: simulation_only
     roles: [robodojo_sim_api]
     nodes: [robodojo_sim]
@@ -326,7 +309,7 @@ graphs:
     readiness_checks: [robodojo_sim.health]
     failure_modes: [bridge_unavailable, provider_unavailable, provider_inference_failed, invalid_action, no_progress, simulator_failure]
     recovery:
-      policy: reflect_then_continue_or_immediate_gpt_takeover_or_abort
+      policy: replan_then_bounded_direct_action_or_abort
     outputs: [episode_trace, post_episode_result, artifacts_owned_by_robodojo]
 
 safety:

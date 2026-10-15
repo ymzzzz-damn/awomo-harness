@@ -1,7 +1,7 @@
 ---
 name: robodojo_sim
 description: Simulation-only embodiment that applies planner, VLA/WAM, and GPT fallback actions in RoboDojo/Isaac Sim.
-version: 0.8.0
+version: 0.7.0
 kind: embodiment_context
 environment: simulation
 ---
@@ -18,8 +18,6 @@ trace, and episode limits.
 ## Control loop
 
 1. Call `health` and select a ready provider from `available_policies`.
-   Supervised runs require `chunk_supervision.required=true`; use
-   `scripts/supervised_bridge.py` for this protocol.
 2. Call `start_session` with a canonical task and the selected `policy_id`.
 3. Wait for `session_status` to report an observation.
 4. Call `current_observation`; read the benchmark's full `instruction` as the
@@ -36,22 +34,25 @@ trace, and episode limits.
 6. Call `execute_action_chunk` with the returned chunk id, `max_actions=10`
    (or 5 for finer feedback), and `discard_remaining=true`. This executes only
    the original provider prefix and discards its unexecuted tail.
-7. At each fresh observation boundary, read all three cameras and compare the
-   previous/current views and execution receipt. Call `reflect_action_chunk` with
-   the last chunk id, current observation id, visible evidence and verdict.
-   `continue` permits VLA/WAM; `correct` blocks VLA/WAM and permits immediate GPT
-   direct/code takeover; `uncertain` blocks motion until reassessment or abort.
-   Never resume an old tail. A GPT correction also requires fresh reflection.
-8. On the first clearly wrong execution or provider failure, use
-   `submit_direct_action_chunk` or `run_code_policy` immediately. No failed
-   retry or prompt revision is required. The terminal window is reflected using
-   saved videos after the native control server closes.
+7. At the fresh observation boundary, judge progress and replan before requesting
+   a new provider chunk. Never resume an old tail against the new observation.
+8. Only after an attributable provider failure or bounded no-progress decision,
+   use `submit_direct_action_chunk`, then execute it through the same
+   `execute_action_chunk` operation.
 9. Abort when safe progress cannot be established. Read official results only
    after the episode process exits.
 
 ## Provider boundary
 
-Only explicitly registered external providers are available. Learned AwomoPaw skills are loaded through their versioned task artifacts.
+An explicit user request to reuse an installed, frozen task skill may select a
+ready provider with `kind=code`. For the local `physicalrsi-align` provider, use
+the `physicalrsi-align-blocks` skill and canonical task `align_blocks`; pass the
+unaltered benchmark instruction to `request_policy_chunk` and execute through
+the same queue. The published program returns one action per observation: do
+not pad it to five or ten actions or repeat old actions. This is reuse of an
+existing task-specific program, not a newly LLM-generated fallback. It does not
+replace the default VLA/WAM planning workflow. Preserve its release revision,
+official score and all three camera videos, and report only scored episodes.
 
 `policy_id` resolves through the server-side registry. Pi0.5 is the initial
 provider; later VLA/WAM adapters register the same observation-to-action-chunk
@@ -65,7 +66,8 @@ move the simulated arm.
 
 ## GPT direct-action fallback
 
-A `correct` reflection may immediately trigger a generated code policy. Read `code_policy_api`, then write a new `policy(robot, memory)`
+Repeated VLA deviations after a revised subtask may instead trigger a generated
+code policy. Read `code_policy_api`, then write a new `policy(robot, memory)`
 using that API and call `run_code_policy` with the current observation id, source,
 memory and visible failure reason. The benchmark instruction and episode origin
 come from the environment, never from a replacement goal in the request.
