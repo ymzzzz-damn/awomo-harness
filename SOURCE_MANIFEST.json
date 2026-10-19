@@ -1,6 +1,6 @@
 {
   "project": "AwomoPaw",
-  "scope": "Complete vendored QwenPaw framework with AwomoPaw extensions and RoboDojo integration source",
+  "scope": "Complete QwenPaw/AwomoPaw framework with direct joint-control RoboDojo integration",
   "external_base": {
     "repository": "https://github.com/agentscope-ai/QwenPaw",
     "commit": "e6e0dcd85b11212d3bf945a724adc295baa03902"
@@ -15,8 +15,8 @@
   "files": [
     {
       "path": ".gitignore",
-      "sha256": "7b03fabd0b9ebe4333fbaca77dc6155da2a5273137265d106c21ec26841ae89f",
-      "bytes": 78
+      "sha256": "0534d9e5ca57cc5b83c0ef82335ce347b00c12e42b8ffc3a36bc0e2e7c07776c",
+      "bytes": 121
     },
     {
       "path": "LICENSE",
@@ -30,33 +30,38 @@
     },
     {
       "path": "README.md",
-      "sha256": "f8e39d75303c7f3190c9bc06d86da8ed26c4cac77abdf36260bf008616214a68",
-      "bytes": 3583
+      "sha256": "89ba0c97f563b848907dafe46268c07064a5b9337cd1251f6d54d4af16f77a2b",
+      "bytes": 3699
+    },
+    {
+      "path": "docs/deployment-validation.json",
+      "sha256": "3ca86f829e03bf36176ff86cf99c94b365bba4311ebf64ffb7e8907bd363c79a",
+      "bytes": 1217
     },
     {
       "path": "docs/ownership.json",
-      "sha256": "6778cc4d448908f57abbc2aae0e96bc0a1bf7cd0671e94873f3163072f439702",
-      "bytes": 6662
+      "sha256": "d115c6da43aae33af7e451033592dfd42c7f3edf60930d31d201adc8c77b65ba",
+      "bytes": 6790
     },
     {
       "path": "docs/runtime.md",
-      "sha256": "0df2f94136eb1b0b8544abe9d5fbec90d1c24f35ea289c66681d38c007a67111",
-      "bytes": 1688
+      "sha256": "5caaa16a56e053d200632ee912f7d9dbba510a217b803c35f5080862087ec170",
+      "bytes": 5644
     },
     {
       "path": "docs/source-completeness.md",
-      "sha256": "38dc9d9962fa792c5fe7a031d93572eb4c95bf1edd1e9f29b3657c4a02a533de",
-      "bytes": 2464
+      "sha256": "3cb463f159bc7b5be7f8d6c752e98449d48b80c9668888598af280bea0d67176",
+      "bytes": 1719
     },
     {
       "path": "embodiments/robodojo_sim/EMBODIMENT.md",
-      "sha256": "706c14a9f8878b58523a20d743f6ba171ab8baafd1276b8f79d5878e825fd75f",
-      "bytes": 6016
+      "sha256": "616e2daf5db3aa49078ee3123e2714a7c93642ff0fc500be517b52c6444b4f77",
+      "bytes": 1988
     },
     {
       "path": "embodiments/robodojo_sim/embodiment.yaml",
-      "sha256": "7adfd4493bc34877e637b8c437d7ce3607a76788c3eea238c5e5a3f9ff81a7b9",
-      "bytes": 16664
+      "sha256": "0575aca66a99388c09447adf702fb810b322fc44c873bae0459ed4337a3fdd14",
+      "bytes": 15102
     },
     {
       "path": "patches/awomopaw.patch",
@@ -100,18 +105,8 @@
     },
     {
       "path": "robodojo-overlay/src/eval_client/interactive_harness.py",
-      "sha256": "4203134dbf6968701e8a7fc78f26221e4d464c712f33b824eaadbacf51aa2f3a",
-      "bytes": 35841
-    },
-    {
-      "path": "runtime/awomopaw-code-policy/contract.py",
-      "sha256": "e656442d23c6f22ec39034141bb8a881da276ff8a7e1a150a69c0a03d8ae52c9",
-      "bytes": 4413
-    },
-    {
-      "path": "runtime/awomopaw-code-policy/worker.py",
-      "sha256": "ac188623294fc559481ebd4f1ba33944e179e227416f38076d27c6f0052639b7",
-      "bytes": 10353
+      "sha256": "df65615eb89916a8508c8b2edf81368da49329a6ab0b4b1738695881c029053e",
+      "bytes": 35842
     },
     {
       "path": "runtime/gpt6-harness-ablation-adapter/deploy.py",
@@ -120,8 +115,8 @@
     },
     {
       "path": "runtime/gpt6-harness-ablation-adapter/deploy.yml",
-      "sha256": "64c9fd1cf946ff805f2f6bbd7a4db02ff367442249500269c9ef7babf47d4112",
-      "bytes": 459
+      "sha256": "009ff0f84c27ce128ae40dd5be2f9d9350bb88b9da6208fee217de0b40a3b729",
+      "bytes": 380
     },
     {
       "path": "runtime/gpt6-harness-ablation-adapter/eval.sh",
@@ -130,8 +125,8 @@
     },
     {
       "path": "runtime/gpt6-harness-ablation-adapter/interactive_harness.py",
-      "sha256": "934da75c453c0765f4ef9d5e1965c4bbc9f6ec9668f99551f206591e310ee3d8",
-      "bytes": 33965
+      "sha256": "5de9fa1ea9cc5e2ddb0623e28b0a01ecb697ddb00bdaa8b6af13bf707c2b0c72",
+      "bytes": 33966
     },
     {
       "path": "runtime/gpt6-harness-ablation-adapter/model.py",
@@ -140,13 +135,13 @@
     },
     {
       "path": "runtime/gpt6-harness-ablation-adapter/setup_eval_env_client.sh",
-      "sha256": "eef80bf02c0b78c9b52360a8c869e66d1d1074a9ec931019a0253efead6527ed",
-      "bytes": 844
+      "sha256": "294d6e74fb1393d7419b92ff8891dbb567340113670bbf67b515073266fe5406",
+      "bytes": 942
     },
     {
       "path": "runtime/gpt6-harness-ablation-adapter/setup_eval_policy_server.sh",
-      "sha256": "01d0c70487426e9e60a103357e4ddf66ab15c54a1c8f13d97e9ae5c29dead070",
-      "bytes": 2243
+      "sha256": "98e7304cae407ed5a7d923106f2baed8ee1126e56665ba4123832117c28457b7",
+      "bytes": 2194
     },
     {
       "path": "scripts/apply_awomopaw.py",
@@ -164,24 +159,29 @@
       "bytes": 4314
     },
     {
+      "path": "scripts/configure_robodojo.py",
+      "sha256": "513db02751f9412a7413b3b9f33325fdc1ef042bfa94e98879f0fb5b1919a847",
+      "bytes": 3428
+    },
+    {
       "path": "scripts/evaluate_awomo_open.py",
-      "sha256": "2795484b87326b516ce34a6e7e04d27cc724e92b34f6eb58e5005c9f2eff0541",
-      "bytes": 19363
+      "sha256": "6f9cc31047dfde788c609fefca62f406201ea6f7a9e129e99616274a5501c890",
+      "bytes": 19157
     },
     {
       "path": "scripts/evaluate_gpt6_self_evolution.py",
-      "sha256": "0184da670df4bd6bc7b1e41b2f37cf5b9ca7af25cd2a8293364cfdae147afec5",
-      "bytes": 14045
+      "sha256": "df7809989a472a7b8590fa4d92aeb6a775186b24b1d17385545de70c5a429b8c",
+      "bytes": 12933
     },
     {
       "path": "scripts/gpt6_ablation_bridge.py",
-      "sha256": "f23a8a46c9516561e9f4d6cfa15190b2d2a999032ced4ae09295a086ca3ce314",
-      "bytes": 13642
+      "sha256": "2975bcf49b34a533cbccab7c23f1556a1c81d3d86d275f0a351588f767b5e77d",
+      "bytes": 12194
     },
     {
       "path": "scripts/gpt6_episode.py",
-      "sha256": "ab760005ee7949ee642acd4fcc17086d27d80d16f6d012decffa3011d8129920",
-      "bytes": 16161
+      "sha256": "9757123521d96c45220b96a511f5098c28072e9d10bb49b66d26f03e4230be38",
+      "bytes": 15715
     },
     {
       "path": "scripts/gpt6_failure_learning.py",
@@ -190,8 +190,13 @@
     },
     {
       "path": "scripts/gpt6_task_learning.py",
-      "sha256": "f36b9a09a99defcfdeff415f027f2c3ed7b176421a7e483ea92da25ea5432639",
-      "bytes": 17268
+      "sha256": "0578bde8689cd5da3dcad54eab29ad557d46130171c49acae0cfea09ed0cad54",
+      "bytes": 17273
+    },
+    {
+      "path": "scripts/harness_episode_process.py",
+      "sha256": "c51590da1e88d539d956056e3a169311e0b4b11d20bce1b1c5df17884428f875",
+      "bytes": 3447
     },
     {
       "path": "scripts/harness_models.py",
@@ -204,14 +209,29 @@
       "bytes": 4336
     },
     {
+      "path": "scripts/install.sh",
+      "sha256": "3bf75b1f44307954a7da50c72a79cb2d3526b43052a56b630e3cd21d39a6e821",
+      "bytes": 588
+    },
+    {
+      "path": "scripts/install_sim_transport.sh",
+      "sha256": "40532565055104d77126fbfedc495fd4415fe8991d89d1e0c60e5b1ad9ead513",
+      "bytes": 492
+    },
+    {
       "path": "scripts/rsi_native_ui.py",
       "sha256": "5b7f85f4324fbedd4344f598045c2c9e4e93ae06e808ee9f77f0ed590e17b919",
       "bytes": 12632
     },
     {
       "path": "scripts/run_gpt6_harness_agent.py",
-      "sha256": "aa67999a3a57deb99bae35df7cd4950adf485e63188d0bca0a80404bd669eb7e",
-      "bytes": 18719
+      "sha256": "27eb94ff19715c1a777b8d61e2a8dda089c08a22e414e0148d25fc7bcb302bbe",
+      "bytes": 18077
+    },
+    {
+      "path": "scripts/smoke_direct_control.py",
+      "sha256": "d72c8c50ff9dc7ab2ebf980fbb4b39c9edef5f1d7c4faa42d36e552893e5f4cd",
+      "bytes": 4332
     },
     {
       "path": "scripts/subtask_supervisor.py",
@@ -220,8 +240,8 @@
     },
     {
       "path": "scripts/supervised_bridge.py",
-      "sha256": "3904db562990798632dc3b39a329fd0e22b656247eb5a433f7c6e80a4760637d",
-      "bytes": 5731
+      "sha256": "cce898ac24c13587da1f1b0e08502a6e379d3c5b6ab7a220ae7c2c02d8c4bbee",
+      "bytes": 5179
     },
     {
       "path": "scripts/sync_awomo_open.py",
@@ -245,8 +265,8 @@
     },
     {
       "path": "skills/robodojo-vla-control/SKILL.md",
-      "sha256": "881a9ff323a65c9504455070539170a5929900adc38b921444ee6185930c2fc9",
-      "bytes": 8108
+      "sha256": "77493af1e747845f7c71175f684912e95b5dc4f3ec3e19118b4dfd9a7a059f43",
+      "bytes": 6755
     },
     {
       "path": "skills/robodojo-vla-control/references/action-contract.md",
@@ -260,8 +280,8 @@
     },
     {
       "path": "skills/robodojo-vla-control/references/failure-fallback.md",
-      "sha256": "408e038c37836e6b46066266dfa7e95089867288e7bf2a635933d0819cb7fb39",
-      "bytes": 2177
+      "sha256": "a613450032d5f1a3ae791229457ae06d119da89accbab8fa6ea4f0a5a0c6a31b",
+      "bytes": 2183
     },
     {
       "path": "skills/robodojo-vla-control/references/new-adapter.md",
@@ -2250,18 +2270,18 @@
     },
     {
       "path": "source/embodiments/packages/robodojo_sim/EMBODIMENT.md",
-      "sha256": "e0d494de97ec8d1c23d9add18990f0a869b16a4e5b7b1d44478c0c4085cf85e7",
-      "bytes": 6085
+      "sha256": "616e2daf5db3aa49078ee3123e2714a7c93642ff0fc500be517b52c6444b4f77",
+      "bytes": 1988
     },
     {
       "path": "source/embodiments/packages/robodojo_sim/embodiment.yaml",
-      "sha256": "08eb423b858a12a29e41cfc1497c4ae64998df3911a048faa0e3f46157e92ebf",
-      "bytes": 15383
+      "sha256": "0575aca66a99388c09447adf702fb810b322fc44c873bae0459ed4337a3fdd14",
+      "bytes": 15102
     },
     {
       "path": "source/embodiments/pyproject.toml",
-      "sha256": "ae70c973249ed5e38e78ffdc41fb1413cee2d2b5bf8871afc9c3c435ffb3e851",
-      "bytes": 406
+      "sha256": "10b33de475d1efc6fd58e93d1a01c099df8096ca7128147b2ccacfad7000f74a",
+      "bytes": 495
     },
     {
       "path": "source/embodiments/runtime/__init__.py",
@@ -2300,8 +2320,8 @@
     },
     {
       "path": "source/pyproject.toml",
-      "sha256": "debaa56e08e4f99723e65af524cde3c29d5e16e0e6a29447db71aad7c00cc16e",
-      "bytes": 3814
+      "sha256": "fbfcd68d86b9194b7794bdca14531526c31689a2475c06faf4aab9c8c90fc895",
+      "bytes": 4128
     },
     {
       "path": "source/scripts/README.md",
@@ -2445,8 +2465,8 @@
     },
     {
       "path": "source/setup.py",
-      "sha256": "772f7c75744d98bfeb69e345ce17436211b457e46cc295485b937f8aacac36f0",
-      "bytes": 62
+      "sha256": "11906a470d2151847ed5fefc895494d924c65c1a9e0396d562890201ac21e9ad",
+      "bytes": 283
     },
     {
       "path": "source/src/qwenpaw/__init__.py",
@@ -4845,8 +4865,8 @@
     },
     {
       "path": "source/src/qwenpaw/agents/tool_guard_mixin.py",
-      "sha256": "0212fd008ec216a4e5da31bf7876d869e17fdcc0bb901c3a115c99d44765f108",
-      "bytes": 29953
+      "sha256": "16fa29b7dfea5b2c45a0a2b6c835685fca4a302c8b3bf3e25cc5c22e6becbf15",
+      "bytes": 29954
     },
     {
       "path": "source/src/qwenpaw/agents/tools/__init__.py",
@@ -5419,11 +5439,6 @@
       "bytes": 786
     },
     {
-      "path": "source/src/qwenpaw/app/embodiments/code_policy_runtime.py",
-      "sha256": "7c7e8468be3ce5c5aab59e76a8f45f7bb818c5b799abe9919f98bbb04be4992b",
-      "bytes": 6489
-    },
-    {
       "path": "source/src/qwenpaw/app/embodiments/execution_policy.py",
       "sha256": "a249b2ee059286e2d25db5f9c3397a7f5b505bf56f078dd3a854f0b97ee60129",
       "bytes": 7400
@@ -5440,8 +5455,8 @@
     },
     {
       "path": "source/src/qwenpaw/app/embodiments/robodojo_adapter.py",
-      "sha256": "e33a3c8b18fb256d42f52cb8996a7b944637abb8992a329edab04f6232d30ae6",
-      "bytes": 44468
+      "sha256": "5b6061470ce86f4ce1a2ad43237cde53390b2f04fdf0fae89303b9cc0c88d562",
+      "bytes": 42851
     },
     {
       "path": "source/src/qwenpaw/app/embodiments/tests/__init__.py",
@@ -6670,8 +6685,8 @@
     },
     {
       "path": "source/tests/unit/agents/test_robodojo_adapter.py",
-      "sha256": "2d139b4477f0af82c753dda0f3f94cf2450873c657f20ca88a85f50acb951a81",
-      "bytes": 16688
+      "sha256": "b23630bc3442e4a8dc4fce4f3f016de8db89b350180479d3ad21d156efd661ec",
+      "bytes": 12803
     },
     {
       "path": "source/tests/unit/agents/test_robot_execution_policy.py",
@@ -7894,9 +7909,9 @@
       "bytes": 2965
     },
     {
-      "path": "tests/test_code_policy_worker.py",
-      "sha256": "4ab9816d281a862fdf68086866b3732833e5e64b0f1d8c66409ba6f24ad7e3d0",
-      "bytes": 3759
+      "path": "tests/test_direct_joint_control.py",
+      "sha256": "543ed7893248b164c0b05d6256579998e720a9d146b1fe9ab9e54c0eafff3322",
+      "bytes": 4729
     },
     {
       "path": "tests/test_gpt6_self_evolution.py",
@@ -7910,8 +7925,8 @@
     },
     {
       "path": "tests/test_task_learning_loop.py",
-      "sha256": "ba801726cf84fcb29af3ec0e02b71c76658608741ce2d1dc14474acd0d035465",
-      "bytes": 14417
+      "sha256": "1780e8a5a54827c108a42cceeee8852ac86871bf3c21ad445fb7758789470336",
+      "bytes": 9611
     },
     {
       "path": "tests/test_trajectory_ui.py",
@@ -7942,23 +7957,23 @@
   "awomopaw_source_snapshot": {
     "host": "P6000",
     "directory": "/mnt/auwomo-data/wangxin/qwenpaw-harness/workspace/awomopaw",
-    "stage": "pre-experiment workspace",
+    "stage": "Published framework base plus current direct-control and packaging fixes",
     "scope": "AwomoPaw framework only; no experiment runtime fixes or RoboDojo evaluation changes",
     "source_files": 141,
     "source_index_sha256": "905c831529bd9bd85eb3484858ca5972bd2947e21dc21960fec5e6f4a01b9ece",
     "packaging_adaptations": {
-      "embodiments/pyproject.toml": "Preserve the published simulation-only package metadata; hardware builders are not vendored.",
-      "src/qwenpaw/app/embodiments/code_policy_runtime.py": "Preserve the existing explicit external primitive-provider configuration instead of private deployment dependency paths.",
-      "tests/unit/agents/test_robodojo_adapter.py": "Preserve the matching external primitive-provider fixtures and public descriptor schema."
+      "source/setup.py": "Bundle embodiment loader and descriptors in the main wheel",
+      "source/embodiments/pyproject.toml": "Bundle standalone descriptor resources; no relative file dependency"
     }
   },
   "snapshot_date": "2026-10-19",
-  "parent_github_commit": "8442593eca942af5a0f610dd482f4dcbcbbdc705",
+  "parent_github_commit": "dd1ee017d39682857894512f013547a285b3fdd5",
   "packaging": "Complete assembled source under source/; no separate upstream checkout is required",
   "source_counts": {
     "upstream_paths": 1472,
     "upstream_paths_present": 1472,
-    "assembled_files": 1521,
-    "qwenpaw_package_files": 802
-  }
+    "assembled_files": 1520,
+    "qwenpaw_package_files": 801
+  },
+  "control_path": "Public RGB/proprioception -> GPT-authored explicit joint chunks -> native simulator executor; no generated Python worker or primitive provider"
 }

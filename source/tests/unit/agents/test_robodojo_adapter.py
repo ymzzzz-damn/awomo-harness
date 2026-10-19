@@ -274,81 +274,12 @@ def test_execution_window_survives_http_bridge(tmp_path: Path):
         assert len(captured) == 2
 
 
-def test_code_policy_api_and_submission_http_contract(tmp_path: Path):
-    from fastapi.testclient import TestClient
-
-    manager = RoboDojoRunManager(_fake_install(tmp_path))
-    captured = []
-    def submit(payload):
-        captured.append(payload)
-        return {"policy_id": "code-test", "status": "running"}
-    manager.start_code_policy = submit
-    with TestClient(create_app(manager=manager)) as client:
-        response = client.get("/v1/sessions/code-policy-api")
-        assert response.status_code == 200
-        assert "detect(text, count=1, plane_z=None)" in response.json()["methods"]
-        assert "instruction" not in response.json()
-        response = client.post("/v1/sessions/code-policies", json={
-            "observation_id": "a" * 32, "source": "def policy(robot, memory):\n    robot.hold(1)\n",
-            "fallback_reason": "Repeated VLA deviation after a prompt revision",
-        })
-        assert response.status_code == 200
-        assert captured[0]["memory"] == {}
-        response = client.post("/v1/sessions/code-policies", json={
-            "observation_id": "a" * 32, "source": "x", "fallback_reason": "failure",
-            "instruction": "An invented goal",
-        })
-        assert response.status_code == 422
-        assert len(captured) == 1
 
 
-def test_code_takeover_rejects_imports_before_spawning(tmp_path: Path):
-    manager = RoboDojoRunManager(_fake_install(tmp_path))
-    with pytest.raises(ValueError, match="import"):
-        manager.start_code_policy({"source": "import os\ndef policy(robot, memory):\n    pass\n"})
-    assert manager._code_processes == {}
 
 
-def test_vla_inference_is_blocked_while_code_owns_the_episode(tmp_path: Path):
-    from types import SimpleNamespace
-
-    manager = RoboDojoRunManager(_fake_install(tmp_path))
-    manager._code_processes["code-test"] = SimpleNamespace(poll=lambda: None)
-    with pytest.raises(ValueError, match="concurrently"):
-        manager.request_policy_chunk({"provider_id": "pi05"})
 
 
-def test_code_worker_pins_official_goal_origin_and_qualified_environment(tmp_path, monkeypatch):
-    from types import SimpleNamespace
-    import qwenpaw.app.embodiments.code_policy_runtime as runtime
-
-    manager = RoboDojoRunManager(_fake_install(tmp_path))
-    origin = {"left_arm_joint_state": [0.0] * 6, "right_arm_joint_state": [0.0] * 6}
-    manager.current_observation = lambda: {
-        "observation_id": "a" * 32, "run_id": "run-test", "instruction": "Benchmark instruction",
-        "initial_robot_state": origin,
-    }
-    manager.get_run = lambda run_id: SimpleNamespace(run_id=run_id, artifact_dir=str(tmp_path / "native"))
-    primitives = tmp_path / 'primitives'
-    primitives.mkdir()
-    monkeypatch.setenv('ROBODOJO_PRIMITIVES_PATH', str(primitives))
-    monkeypatch.setenv('ROBODOJO_CODE_POLICY_PYTHON', '/configured/bin/python')
-    monkeypatch.setenv('MODEL_API_KEY', 'test-secret')
-    captures = []
-    def spawn(cmd, **kwargs):
-        captures.append((cmd, kwargs))
-        return SimpleNamespace(pid=123, poll=lambda: None)
-    monkeypatch.setattr(runtime.subprocess, "Popen", spawn)
-    monkeypatch.setattr(runtime.threading, "Thread", lambda **kwargs: SimpleNamespace(start=lambda: None))
-    job = manager.start_code_policy({"observation_id": "a" * 32,
-        "source": "def policy(robot, memory):\n    robot.hold(1)\n", "memory": {}, "fallback_reason": "Repeated observed failure"})
-    config = json.loads((Path(job["artifact_dir"]) / "worker-config.json").read_text())
-    assert config["instruction"] == "Benchmark instruction"
-    assert config["initial_state"] == origin
-    assert captures[0][0][0] == '/configured/bin/python'
-    assert captures[0][1]['env']['PYTHONPATH'].split(__import__('os').pathsep)[-1] == str(primitives)
-    assert 'physicalrsi' not in captures[0][1]['env']['PYTHONPATH'].lower()
-    assert 'MODEL_API_KEY' not in captures[0][1]['env']
 
 
 def test_execution_environment_recovers_conda_for_service_process(

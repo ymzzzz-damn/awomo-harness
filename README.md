@@ -16,7 +16,7 @@ AwomoPaw 的发行包和主命令叫 `awomopaw`，内部 Python 包仍叫 `qwenp
 | `source/website/` | QwenPaw 上游网站源码和文档 |
 | `source/embodiments/` | 仿真 embodiment 加载器和 RoboDojo 描述文件 |
 | `robodojo-overlay/` | RoboDojo 交互 harness 与 Awomopaw_Harness 策略接入 |
-| `runtime/awomopaw-code-policy/` | 生成策略的执行契约、worker 和动作片段边界 |
+| `runtime/gpt6-harness-ablation-adapter/` | GPT 直接关节控制、原生仿真交互与生命周期传输 |
 | `scripts/` | 子任务监督、视频复盘、技能蒸馏、跨场景记忆、open 任务评测与结果同步 |
 | `ui/trajectory/` | 视频、轨迹、评分和学习过程的查看界面 |
 | `tests/`、`source/tests/` | 集成与单元回归测试 |
@@ -28,8 +28,7 @@ AwomoPaw 的发行包和主命令叫 `awomopaw`，内部 Python 包仍叫 `qwenp
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install -e ./source
-python -m pip install -e ./source/embodiments
+python -m pip install -e "./source[simulation,transport]"
 awomopaw --help
 ```
 
@@ -45,4 +44,6 @@ awomopaw --help
 
 本次完整源码以 QwenPaw `e6e0dcd85b11212d3bf945a724adc295baa03902` 为基础，包含已发布的 AwomoPaw 修改，并同步本地近期的评测、学习和查看器代码。上游许可证与声明保存在 `source/LICENSE`、根目录 `LICENSE` 和 `NOTICE`。`patches/awomopaw.patch` 保留用于追溯原有修改；日常安装直接使用 `source/`。
 
-代码完整不等于运行环境已经打包。RoboDojo/Isaac 仿真器、模型权重、CUDA/感知/IK 环境、凭据和实验视频不在此仓库。代码策略 worker 的感知与运动 primitive provider 仍需按 `docs/runtime.md` 显式配置；仿真 embodiment 包不包含独立真机硬件驱动。PhysicalRSI 项目及第三方任务技能不在此次发布范围内。评测与同步脚本保留原部署的机器路径、节点和 SSH 配置，迁移时需按实际环境调整。
+当前 GPT 路径采用“画面和关节状态 → GPT 生成关节动作块 → 仿真执行 → 反馈”的闭环，已移除原代码策略 worker 及其 SAM3/CuRobo primitive 依赖。每块最多 40 步，支持更短执行窗口与执行后反思。任务成功率需要单独评测。
+
+RoboDojo/Isaac 仿真器、官方场景资产、GPT 凭据和独立真机驱动不在本仓库内。GPT 直接控制不需要 SAM3 或 VLA 权重。完整安装与接线步骤见 [docs/runtime.md](docs/runtime.md)。框架 wheel 已包含 embodiment 加载器和描述文件，`embodiments` extra 作为兼容名称保留。

@@ -32,7 +32,7 @@ from ..constant import (
 )
 
 if TYPE_CHECKING:
-    from qwenpaw.app.approvals.models import PendingApproval
+    from qwenpaw.app.approvals.service import PendingApproval
     from qwenpaw.security.tool_guard.approval import ApprovalDecision
 
 logger = logging.getLogger(__name__)

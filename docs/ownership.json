@@ -25,7 +25,6 @@
     "src/qwenpaw/agents/memory/null_memory_manager.py",
     "src/qwenpaw/app/embodiments/__init__.py",
     "src/qwenpaw/app/embodiments/approval.py",
-    "src/qwenpaw/app/embodiments/code_policy_runtime.py",
     "src/qwenpaw/app/embodiments/execution_policy.py",
     "src/qwenpaw/app/embodiments/executor.py",
     "src/qwenpaw/app/embodiments/manager.py",
@@ -145,5 +144,9 @@
     "src/qwenpaw/utils/startup_display.py",
     "tests/unit/cli/test_cli_update.py",
     "tests/unit/workspace/test_workspace.py"
+  ],
+  "current_control": "GPT-authored direct joint action chunks; generated Python workers removed",
+  "removed_extensions": [
+    "src/qwenpaw/app/embodiments/code_policy_runtime.py"
   ]
 }

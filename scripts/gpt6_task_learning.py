@@ -40,12 +40,12 @@ Each lesson needs an observable trigger, applicable correction/check and limits.
 On SUCCESS: explain plausible successful mechanisms, retain useful prior failure
 checks, and distill a task skill as Markdown beginning with a heading (no YAML).
 Describe reusable subtasks, current-RGB checks, action budget and completion checks;
-avoid replaying literal targets or presenting the last worker as the whole solution.
+avoid replaying literal targets or presenting the last action chunk as the whole solution.
 On FAILURE: diagnose causes and propose next-policy corrections; skill_text must
 be empty and success_mechanisms must be []. Do not replace an existing success skill.
 For BOTH outcomes update bounded task memory and propose evidence-based policy
 improvements, for the next scene of the SAME task. Success is not proof that each
-worker or every motion was necessary. Keep outcome_summary <=1500 characters,
+chunk or every motion was necessary. Keep outcome_summary <=1500 characters,
 each observation/hypothesis/lesson/mechanism/improvement <=1500, task memory <=10000,
 skill_text <=8000. These are development references, not independent qualification.
 Return only the requested JSON. Do not train weights or restart the task.'''

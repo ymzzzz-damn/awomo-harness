@@ -20,9 +20,9 @@ scene, low confidence alone, or one ambiguous frame is not enough to take over.
    `continue` for useful progress, `correct` for a clear deviation/provider error,
    `uncertain` for insufficient evidence.
 3. On `correct`, immediately use one grounded GPT direct action or generate a
-   Python policy through the primitive API. Do not require a retry/prompt revision.
+   bounded direct joint action chunk. Do not require a retry/prompt revision.
 4. Reobserve after correction and submit another reflection. Return to VLA/WAM
-   only on `continue`. Delegated code owns its primitives until it returns.
+   only on `continue`. Execute the validated chunk, then inspect the fresh observation.
 5. On `uncertain`, inspect again or abort; neither controller may move until
    reassessment. Abort on simulator failure, stale identities or exhausted budget.
 

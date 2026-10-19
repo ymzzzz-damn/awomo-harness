@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-19",
+  "scope": "direct joint control deployment; not model task-success evaluation",
+  "source_parent": "dd1ee017d39682857894512f013547a285b3fdd5",
+  "regression": {
+    "passed": 127,
+    "deselected": 2,
+    "reason": "independent JetRover hardware-package cases"
+  },
+  "packaging": {
+    "agent_wheel_built": true,
+    "standalone_embodiment_wheel_built": true,
+    "both_include_robodojo_descriptors": true,
+    "relative_file_dependency_removed": true
+  },
+  "native_simulation": {
+    "RoboDojo_commit": "09bd5f5e762b949f5858ece31347ce62057b3a5e",
+    "XPolicyLab_commit": "53c5da5a01bc720d1cf0e6ab6ed212e8cef0eda2",
+    "gpu": "NVIDIA GeForce RTX 4090",
+    "action_limit": 200,
+    "executed_actions": 200,
+    "natural_episode_end": true,
+    "official_result_written": true,
+    "gpt_model_called": false,
+    "task_success_claim": false,
+    "primitive_provider_loaded": false,
+    "test_behavior": "repeat observed joint targets through direct-action chunks until the native action budget ends",
+    "environment_qualification": "Used an isolated checkout with an existing installed RoboDojo/Isaac environment and official assets; not a fresh CUDA/Isaac binary installation."
+  }
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One native scene with GPT6-authored code/direct actions; VLA inference disabled."""
+"""One native scene with GPT6-authored direct joint actions; VLA inference disabled."""
 import argparse
 from dataclasses import replace
 import json
@@ -26,8 +26,8 @@ class HarnessProvider(PolicyProvider):
             problems.append('Lifecycle transport stub is missing')
         if not (self.policy_uv_env_path/'.venv/bin/python').is_file():
             problems.append('Transport Python environment is missing')
-        return {'provider_id':self.provider_id,'kind':'code','policy_name':self.policy_name,
-            'revision':self.revision,'capabilities':['gpt_authored_code','direct_joint_action'],
+        return {'provider_id':self.provider_id,'kind':'direct','policy_name':self.policy_name,
+            'revision':self.revision,'capabilities':['direct_joint_action'],
             'input_contract':'robodojo.observation/v1','output_contract':'robodojo.action-chunk/v1',
             'lifecycle':['observe','execute','reset','close'],'effects':['simulation-action'],
             'ready':not problems,'problems':problems,'vla_loaded':False,'frozen_controller':False}
@@ -42,17 +42,13 @@ class GPT6AblationManager(FixtureManager):
         self.subtask_gate=SubtaskSupervisor() if settings else None
         self.segment_actions=settings['max_actions'] if settings else None
         if settings:
-            if type(self.segment_actions) is not int or not 10 <= self.segment_actions <= 100:
-                raise ValueError('Subtask action segment must be 10..100')
-            runtime,_=self._code_runtime()
-            if ('awomopaw.subtask-boundary/v1' not in (runtime/'worker.py').read_text() or
-                    os.environ.get('ROBODOJO_SUBTASK_MAX_ACTIONS')!=str(self.segment_actions)):
-                raise ValueError('Subtask supervision requires the bounded worker and matching action cap')
+            if type(self.segment_actions) is not int or not 1 <= self.segment_actions <= 40:
+                raise ValueError('Subtask action segment must be 1..40')
 
     def health(self):
         result=super().health()
         result.update(planning_handoff='GPT6 authors every action directly through the harness',
-                      execution_modes=['interactive','gpt6_direct_joint','gpt6_generated_code'],vla_used=False)
+                      execution_modes=['interactive','gpt6_direct_joint'],vla_used=False)
         if self.subtask_gate:
             result['subtask_supervision']={'required':True,'max_actions':self.segment_actions,
                 'phase':'subtask_return_or_action_segment','model_calls_per_joint_action':0}
@@ -62,9 +58,6 @@ class GPT6AblationManager(FixtureManager):
         gate=getattr(self, 'subtask_gate', None)
         if not gate:return
         gate.bind(obs)
-        if gate.active and gate.active.startswith('code-') and not self.code_policy_running():
-            status=super().code_policy_status(gate.active)
-            if status['status']!='running':gate.completed(gate.active,status,obs)
 
     def current_observation(self):
         obs=super().current_observation()
@@ -90,15 +83,6 @@ class GPT6AblationManager(FixtureManager):
     def _require_subtask_review(self):
         if getattr(self,'subtask_gate',None):self.subtask_gate.require(self.current_observation())
 
-    def code_policy_api(self):
-        api=super().code_policy_api()
-        if getattr(self,'subtask_gate',None):
-            api={**api,'subtask_supervision':dict(max_actions=self.segment_actions,
-                instruction='Write one subtask per worker. Record the active primitive in memory; '
-                'mark completion only after it returns. A cutoff means partial progress. '
-                'A supervision_boundary return pauses motion without ending the episode; reobserve, '
-                'reflect, then generate the remaining subtask from current state. Do not restart completed motion.')}
-        return api
 
     def start_attempt(self, **kwargs):
         if self.started:
@@ -133,7 +117,7 @@ class GPT6AblationManager(FixtureManager):
             raise
 
     def _command(self, run):
-        return [sys.executable,str(Path(__file__).with_name('frozen_skill_episode_process.py')),
+        return [sys.executable,str(Path(__file__).with_name('harness_episode_process.py')),
             '--root',str(self.config.robodojo_root),'--policy-dir',str(self.config.policy_dir),
             '--task',run.task,'--checkpoint',run.provider_checkpoint,'--env-cfg',self.config.env_cfg,
             '--action-type','joint','--seed',str(run.seed),'--gpu',str(self.config.env_gpu),
@@ -190,30 +174,23 @@ class GPT6AblationManager(FixtureManager):
 
     def submit_direct_action_chunk(self, payload):
         self.require_skill_reads()
-        worker_running=self.code_policy_running()
-        if not worker_running:self._require_subtask_review()
+        self._require_subtask_review()
+        if len(payload.get('actions', [])) > (getattr(self, 'segment_actions', None) or 40):
+            raise ValueError('Direct action segment exceeds its configured action cap')
         result=super().submit_direct_action_chunk(payload)
-        if getattr(self,'subtask_gate',None) and not worker_running:
+        if getattr(self,'subtask_gate',None):
             self.subtask_gate.start(result['chunk_id'],self.current_observation())
         self.record_experience_application(payload,result,'direct_action')
         return result
 
     def execute_action_chunk(self, chunk_id, max_actions=None, discard_remaining=False):
-        worker_running=self.code_policy_running()
+        if discard_remaining is not True or type(max_actions) is not int or not 1 <= max_actions <= (getattr(self, 'segment_actions', None) or 40):
+            raise ValueError('Execute 1..segment_actions and discard the unexecuted tail')
         result=super().execute_action_chunk(chunk_id,max_actions,discard_remaining)
-        if getattr(self,'subtask_gate',None) and not worker_running and not result.get('episode_end'):
+        if getattr(self,'subtask_gate',None) and not result.get('episode_end'):
             self.subtask_gate.completed(chunk_id,result,self.current_observation())
         return result
 
-    def start_code_policy(self, payload):
-        self.require_skill_reads()
-        self._require_subtask_review()
-        initial=super().current_observation() if getattr(self,'subtask_gate',None) else None
-        result=super().start_code_policy(payload)
-        if getattr(self,'subtask_gate',None):
-            self.subtask_gate.start(result['policy_id'],initial)
-        self.record_experience_application(payload,result,'generated_code')
-        return result
 
     def get_result(self, run_id):
         if self.get_run(run_id).status in {'starting','running'}:
@@ -228,10 +205,10 @@ def main():
     args=parser.parse_args()
     config=RoboDojoAdapterConfig.from_env()
     providers=config.providers
-    if len(providers)!=1 or providers[0].provider_id!='gpt6-harness' or providers[0].kind!='code':
+    if len(providers)!=1 or providers[0].provider_id!='gpt6-harness' or providers[0].kind not in {'code','direct'}:
         raise ValueError('Registry must contain only GPT6 harness control')
     p=providers[0]
-    provider=HarnessProvider(p.provider_id,p.kind,p.policy_name,p.checkpoint,p.policy_uv_env_path,p.revision)
+    provider=HarnessProvider(p.provider_id,'direct',p.policy_name,p.checkpoint,p.policy_uv_env_path,p.revision)
     config=replace(config,providers=(provider,))
     manager=GPT6AblationManager(config,args.fixture,args.policy_port)
     app=create_app(manager=manager)

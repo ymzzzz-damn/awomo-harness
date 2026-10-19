@@ -5,3 +5,8 @@ __pycache__/
 runtime/gpu-locks/
 eval_result/
 .env
+
+build/
+dist/
+node_modules/
+runtime-state/

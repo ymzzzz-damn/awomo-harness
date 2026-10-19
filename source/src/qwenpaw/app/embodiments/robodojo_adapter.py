@@ -22,7 +22,6 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .code_policy_runtime import CodePolicyManagerMixin
 
 
 _TASK_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,127}$")
@@ -101,7 +100,7 @@ class DirectActionRequest(BaseModel):
     subtask_goal: str = Field(min_length=1, max_length=1000)
     fallback_reason: str = Field(min_length=1, max_length=1000)
     rationale: str = Field(default="", max_length=2000)
-    actions: list[dict[str, list[float]]] = Field(min_length=1, max_length=1)
+    actions: list[dict[str, list[float]]] = Field(min_length=1, max_length=40)
 
 
 class ExecuteChunkRequest(BaseModel):
@@ -118,12 +117,6 @@ class AbortSessionRequest(BaseModel):
     reason: str = Field(default="agent_abort", max_length=500)
 
 
-class CodePolicyRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    observation_id: str = Field(min_length=8, max_length=64)
-    source: str = Field(min_length=1, max_length=60000)
-    memory: dict[str, Any] = Field(default_factory=dict)
-    fallback_reason: str = Field(min_length=1, max_length=1000)
 
 
 @dataclass(frozen=True)
@@ -140,8 +133,8 @@ class PolicyProvider:
     def public(self, robodojo_root: Path) -> dict[str, Any]:
         policy_dir = robodojo_root / "XPolicyLab" / "policy" / self.policy_name
         problems: list[str] = []
-        if self.kind not in {"vla", "wam", "code"}:
-            problems.append("kind must be vla, wam or code")
+        if self.kind not in {"vla", "wam", "code", "direct"}:
+            problems.append("kind must be vla, wam, code or direct")
         if not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", self.provider_id):
             problems.append("provider_id is invalid")
         if not _TASK_RE.fullmatch(self.policy_name):
@@ -164,7 +157,7 @@ class PolicyProvider:
                     raise ValueError("frozen skill release id mismatch")
             except (OSError, ValueError, KeyError, TypeError) as exc:
                 problems.append(f"frozen skill is unavailable: {exc}")
-        elif not (policy_dir / "checkpoints" / self.checkpoint).is_dir():
+        elif self.kind in {"vla", "wam"} and not (policy_dir / "checkpoints" / self.checkpoint).is_dir():
             problems.append(
                 f"checkpoint is missing: {policy_dir / 'checkpoints' / self.checkpoint}"
             )
@@ -404,7 +397,7 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-class RoboDojoRunManager(CodePolicyManagerMixin):
+class RoboDojoRunManager:
     """Serialize harness attempts and retain post-episode receipts."""
 
     def __init__(self, config: RoboDojoAdapterConfig) -> None:
@@ -413,8 +406,6 @@ class RoboDojoRunManager(CodePolicyManagerMixin):
         self._runs: dict[str, EvaluationRun] = {}
         self._processes: dict[str, subprocess.Popen[bytes]] = {}
         self._latest_run_id: str | None = None
-        self._code_jobs: dict[str, dict[str, Any]] = {}
-        self._code_processes: dict[str, subprocess.Popen[bytes]] = {}
 
     def health(self) -> dict[str, Any]:
         problems = self.config.validate()
@@ -434,7 +425,7 @@ class RoboDojoRunManager(CodePolicyManagerMixin):
                 provider.public(self.config.robodojo_root)
                 for provider in self.config.provider_registry.values()
             ],
-            "execution_modes": ["interactive", "llm_direct_fallback", "llm_code_policy_fallback"],
+            "execution_modes": ["interactive", "llm_direct_fallback"],
             "control_url": f"http://127.0.0.1:{self.config.control_port}",
             "planning_handoff": (
                 "llm_plan_to_registered_policy_to_embodiment_action_chunk; "
@@ -818,8 +809,6 @@ class RoboDojoRunManager(CodePolicyManagerMixin):
         return response.content, response.headers.get("content-type", "image/jpeg")
 
     def request_policy_chunk(self, payload: dict[str, Any]) -> dict[str, Any]:
-        if self.code_policy_running():
-            raise ValueError("Generated code owns this episode; do not request VLA actions concurrently")
         run = self._active_session()
         if payload.get("provider_id") != run.policy_id:
             raise ValueError(
@@ -853,7 +842,6 @@ class RoboDojoRunManager(CodePolicyManagerMixin):
         )
 
     def abort_session(self, reason: str) -> dict[str, Any]:
-        self.stop_code_policies()
         return self._control_request(
             "POST",
             "/v1/session/abort",
@@ -1027,26 +1015,8 @@ def create_app(
         except (AdapterConfigurationError, ValueError) as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-    @app.get("/v1/sessions/code-policy-api")
-    def code_policy_api() -> dict[str, Any]:
-        try:
-            return active_manager.code_policy_api()
-        except (OSError, ValueError) as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-    @app.post("/v1/sessions/code-policies")
-    def run_code_policy(request: CodePolicyRequest) -> dict[str, Any]:
-        try:
-            return active_manager.start_code_policy(request.model_dump())
-        except (AdapterConfigurationError, OSError, ValueError, SyntaxError) as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-    @app.get("/v1/sessions/code-policies/status")
-    def code_policy_status(policy_id: str) -> dict[str, Any]:
-        try:
-            return active_manager.code_policy_status(policy_id)
-        except ValueError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @app.post("/v1/sessions/direct-action-chunks")
     def submit_direct_action_chunk(request: DirectActionRequest) -> dict[str, Any]:

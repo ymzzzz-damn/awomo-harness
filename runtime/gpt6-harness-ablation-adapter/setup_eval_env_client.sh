@@ -19,6 +19,8 @@ UTILS_DIR="${XPL_ROOT}/utils"
 policy_name="$(basename "${SCRIPT_DIR}")"
 yaml_file="${SCRIPT_DIR}/deploy.yml"
 
+export PYTHONPATH="${ROBODOJO_CLIENT_PYTHONPATH:+${ROBODOJO_CLIENT_PYTHONPATH}:}${PYTHONPATH:-}"
+
 exec bash "${UTILS_DIR}/setup_env_client.sh" \
     "${UTILS_DIR}" \
     "${yaml_file}" \

@@ -25,7 +25,7 @@ from PIL import Image
 
 _CAMERA_NAMES = ("cam_head", "cam_left_wrist", "cam_right_wrist")
 _MAX_POLICY_ACTIONS = 256
-_MAX_DIRECT_ACTIONS = 1
+_MAX_DIRECT_ACTIONS = 40
 _ROBOT_STATE_SUFFIXES = (
     "arm_joint_state",
     "ee_joint_state",

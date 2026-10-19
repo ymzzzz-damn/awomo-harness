@@ -51,7 +51,6 @@ dependencies = [
 version = {attr = "qwenpaw.__version__.__version__"}
 
 [tool.setuptools]
-packages = { find = { where = ["src"] } }
 include-package-data = true
 
 [tool.setuptools.package-data]
@@ -66,8 +65,10 @@ include-package-data = true
     "security/skill_scanner/data/**",
 ]
 
+"embodiments" = ["packages/**/*.yaml", "packages/**/*.md"]
+
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project.scripts]
@@ -98,8 +99,20 @@ whisper = [
 full = [
     "awomopaw[local,whisper,embodiments]",
 ]
-embodiments = [
-    "embodiments @ file:./embodiments",
+embodiments = []  # Compatibility extra; the loader is bundled in this wheel.
+transport = [
+    "numpy>=1.26,<2",
+    "opencv-python-headless>=4.8,<4.12",
+    "websockets==15.0.1",
+    "msgpack>=1.0.8",
+    "msgpack-numpy==0.4.8",
+    "h5py>=3.8",
+]
+simulation = [
+    "numpy>=1.26,<3",
+    "fastapi>=0.115",
+    "pydantic>=2.8,<3",
+    "openai>=1.0",
 ]
 sip = [
     "pyVoIP>=1.6.0",

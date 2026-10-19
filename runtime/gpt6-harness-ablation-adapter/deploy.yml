@@ -12,7 +12,7 @@ result_dir: "./results/awomopaw-harness/"
 obs_transform_pipeline: "xspark-v1.0"
 
 action_type: joint
-policy_uv_env_path: /opt/robodojo/eval_result/gpt6-skills-ablation/20261013-231200-runtime/transport
+policy_uv_env_path: .
 train_config_name: pi05_base_aloha_full_sim_arx-x5_seed_0
 repo_id: arx_x5_sim
 

@@ -107,12 +107,8 @@ def run_case(case, arm, gpu, args):
         ROBODOJO_ENV_GPU=str(gpu), ROBODOJO_POLICY_GPU=str(gpu),
         ROBODOJO_ACTION_TYPE='joint', AWOMOPAW_HARNESS_PORT=str(port+1),
         ROBODOJO_HARNESS_POLICY_DIR='XPolicyLab/policy/GPT6_Harness_Ablation',
-        ROBODOJO_HARNESS_POLICY_NAME='GPT6_Harness_Ablation', ROBODOJO_CODE_BRIDGE_URL='http://127.0.0.1:'+str(port), PYTHONUNBUFFERED='1',
+        ROBODOJO_HARNESS_POLICY_NAME='GPT6_Harness_Ablation', PYTHONUNBUFFERED='1',
         PYTHONDONTWRITEBYTECODE='1')
-    # Never inherit segment caps into frozen baseline arms.
-    env.pop('ROBODOJO_SUBTASK_MAX_ACTIONS',None)
-    if fixture.get('subtask_supervision'):
-        env['ROBODOJO_SUBTASK_MAX_ACTIONS']=str(fixture['subtask_supervision']['max_actions'])
     endpoint = 'http://127.0.0.1:' + str(port)
     bridge = agent = None
     runs = []
@@ -228,8 +224,6 @@ def run_case(case, arm, gpu, args):
         base.save(dest/'videos.json', videos)
         if official.get('harness_trace'):
             shutil.copy2(official['harness_trace'], dest/'harness-trace.jsonl')
-        generated = Path(state['artifact_dir'])/'code-policies'
-        if generated.exists(): shutil.copytree(generated,dest/'code-policies')
         reads_path = dest/'skill-reads.json'
         reads = json.loads(reads_path.read_text()) if reads_path.exists() else []
         if arm!='self_evolving' and (arm == 'with_skills') != bool(reads):

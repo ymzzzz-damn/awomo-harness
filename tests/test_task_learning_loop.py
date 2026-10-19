@@ -148,25 +148,6 @@ def test_subtask_gate_reviews_once_after_many_actions_and_rejects_stale_frames()
     with pytest.raises(ValueError,match='uncertainty'):gate.require(obs(40))
 
 
-def test_bridge_synchronizes_worker_return_then_requires_review(tmp_path,monkeypatch):
-    manager=object.__new__(GPT6AblationManager)
-    manager._lock=threading.RLock();manager.subtask_gate=SubtaskSupervisor()
-    manager.subtask_gate.start('code-subtask',obs())
-    current=[obs(0)];running=[True]
-    monkeypatch.setattr(RoboDojoRunManager,'current_observation',lambda _:current[0])
-    monkeypatch.setattr(RoboDojoRunManager,'current_observation_image',lambda _,topic:(b'RGB','image/jpeg'))
-    monkeypatch.setattr(RoboDojoRunManager,'code_policy_running',lambda _:running[0])
-    monkeypatch.setattr(RoboDojoRunManager,'code_policy_status',lambda _,identifier:dict(status='supervision_boundary',executed_actions=40))
-    fixture=tmp_path/'fixture.json';save(fixture,dict(output=str(tmp_path)));manager.fixture=fixture
-    current[0]=obs(40)
-    assert manager.current_observation()['subtask_supervision']['active_id']=='code-subtask'
-    running[0]=False
-    assert manager.current_observation()['subtask_supervision']['reflection_required']
-    with pytest.raises(ValueError,match='Reflect'):manager._require_subtask_review()
-    for camera in CAMERAS:manager.current_observation_image(camera)
-    manager.reflect_subtask(dict(chunk_id='code-subtask',observation_id='observation-40',verdict='continue',reflection='Expected contact maintained'))
-    manager._require_subtask_review()
-    assert len((tmp_path/'subtask-reflections.jsonl').read_text().splitlines())==1
 
 
 def test_learned_skill_requires_complete_hash_verified_reads(tmp_path,case_factory):
@@ -188,50 +169,3 @@ def test_learned_skill_requires_complete_hash_verified_reads(tmp_path,case_facto
     with pytest.raises(ValueError,match='complete learned skill'):manager.require_skill_reads()
 
 
-def test_worker_boundary_preserves_memory_and_never_exceeds_segment_budget(tmp_path,monkeypatch):
-    spec=importlib.util.spec_from_file_location('contract',ROOT/'runtime/awomopaw-code-policy/contract.py')
-    contract=importlib.util.module_from_spec(spec);spec.loader.exec_module(contract)
-    bridge=ModuleType('bridge');bridge.PrimitiveClient=object;bridge.Robot=object;bridge.Sam3TextSegmenter=object;bridge.plain=lambda v:v
-    monkeypatch.setitem(sys.modules,'contract',contract);monkeypatch.setitem(sys.modules,'awomopaw_primitives',bridge)
-    # These control-boundary tests do not exercise OpenCV perception.
-    monkeypatch.setitem(sys.modules,'cv2',ModuleType('cv2'))
-    spec=importlib.util.spec_from_file_location('test_segment_worker',ROOT/'runtime/awomopaw-code-policy/worker.py')
-    worker=importlib.util.module_from_spec(spec);spec.loader.exec_module(worker)
-    monkeypatch.setenv('ROBODOJO_SUBTASK_MAX_ACTIONS','40')
-    source=tmp_path/'policy.py';source.write_text('def policy(robot, memory):\n    return None\n')
-    count=[150]
-    def request(path,payload):
-        if path=='/v1/sessions/observation':return dict(run_id='run',instruction='Native goal',
-            observation_id=str(count[0]),robot_state={'left_arm_joint_state':[0.0]*6},action_count=count[0],action_limit=200)
-        if path=='/v1/sessions/direct-action-chunks':return dict(chunk_id='chunk')
-        if path=='/v1/sessions/action-chunks/execute':
-            count[0]+=1;return dict(executed=1,episode_end=False)
-        raise AssertionError(path)
-    episode=worker.HttpEpisode(dict(output=str(tmp_path/'actual'),source=str(source),run_id='run',
-        instruction='Native goal',initial_state={},fallback_reason='Subtask'),request=request)
-    episode.image=lambda:None
-    for i in range(40):episode.emit({})
-    with pytest.raises(worker.SupervisionBoundary):episode.emit({})
-    assert episode.steps==40 and count[0]==190
-    count[0]=195
-    near_terminal=worker.HttpEpisode(dict(output=str(tmp_path/'near-terminal'),source=str(source),run_id='run',
-        instruction='Native goal',initial_state={},fallback_reason='Subtask'),request=request)
-    assert near_terminal.maximum_actions==5
-    config=tmp_path/'config.json';save(config,dict(output=str(tmp_path/'out'),source=str(tmp_path/'policy.py'),memory={'next_subtask':'push'}))
-    (tmp_path/'policy.py').write_text('def policy(robot, memory):\n    memory["completed"] = 40\n    robot.hold(80)\n')
-    count=[0]
-    class Episode:
-        def __init__(self,config):self.steps=0
-        def image(self):pass
-        def record(self,*args,**kwargs):pass
-    class Robot:
-        def __init__(self,episode):self.episode=episode
-        def hold(self,steps):
-            for i in range(steps):
-                if self.episode.steps>=40:raise worker.SupervisionBoundary()
-                self.episode.steps+=1;count[0]+=1
-    monkeypatch.setattr(worker,'HttpEpisode',Episode);monkeypatch.setattr(worker,'HttpRobot',Robot);monkeypatch.setattr(worker,'Backend',lambda:None)
-    monkeypatch.setattr(sys,'argv',['worker',str(config)]);worker.main()
-    status=json.loads((tmp_path/'out/worker-status.json').read_text())
-    assert status['status']=='supervision_boundary' and status['executed_actions']==count[0]==40
-    assert status['memory']==dict(next_subtask='push',completed=40)

@@ -17,7 +17,7 @@ metadata:
 - GPT（System 2）观察公开图像与机器人状态，规划或修订一个语义 subtask。
 - 已注册 VLA/WAM（System 1）优先把 subtask 和 observation 变成 action chunk。
 - 每个 action chunk 执行窗口后由 GPT 提交 reflection，决定继续 VLA/WAM 或立即接管。
-- GPT 在明确偏离或 provider 失败时生成单步 direct-action 或新的 code-policy。
+- GPT 在明确偏离或 provider 失败时生成有界 direct-action 动作块。
 - embodiment 校验、缓存并执行所有来源的 action，推进 Isaac，并产生下一 observation。
 - RoboDojo 独占 reset、seed、reward、success、评分、视频和正式结果。
 
@@ -63,35 +63,17 @@ metadata:
 ## Provider 失败与 GPT 接管
 
 一次公开反馈已经明确表明偏离 subtask 时，提交 `correct` reflection 后即可
-立即切换到 GPT 单步纠正或 Python code-policy，不要求先重试或改 prompt。
-先调用 `code_policy_api` 获取通用视觉/IK/移动接口；由当前 LLM 根据官方原文、
-公开图像、机器人状态和失败轨迹生成 `def policy(robot, memory)`，再调用
-`run_code_policy`，传入当前 observation id、源码、memory 和具体失败依据。
-不得加载预置的任务专项代码，不得人工修改模型生成的任务策略。
-
-这个分支持续执行模型生成的程序，期间不再调用 VLA；每个 primitive action
-仍通过相同 embodiment 校验、执行并复查。`home()` 使用 episode 初始状态。
-用 `code_policy_status` 查看执行状态和源码 hash；worker 返回不代表任务成功。
-失败后保存代码与公开执行轨迹，让 LLM 修订下一版；episode 已结束则明确记录
-新的尝试。原有的单步 direct-action 回退仍可用于短暂纠正。
-
-以下信号允许进入回退：provider timeout/unavailable、空或非法 chunk、明确
-unsupported/OOD、连续 observation 在有限预算内无视觉进展。一次含糊反馈提交 `uncertain`，重新观察；明确错误不能靠继续 VLA 重试绕过接管。
-
-回退时重新调用 `current_observation`，严格按它返回的动态 `action_spec` 生成
-1 个 absolute-joint action，连同当前 `observation_id`、subtask 和具体
-`fallback_reason` 交给 `submit_direct_action_chunk`，然后仍使用
-`execute_action_chunk`。GPT 不得猜测未公布的维度、复用旧 observation、产生
-NaN/Inf，或把 direct-action 当作默认高频 policy。
-
-无法从公开 observation 建立安全进展时调用 `abort_session`，保留 trace，停止。
-回退判定和停止条件见 [references/failure-fallback.md](references/failure-fallback.md)。
+立即切换到 GPT 关节动作块纠正，不要求先重试或改 prompt。
+读取当前三路画面、robot_state 和 action_spec，直接生成 1..40 步关节目标。
+使用 submit_direct_action_chunk 提交，再通过 execute_action_chunk 执行并丢弃未执行尾部。
+执行后读取最新状态和画面；启用监督时先完成 reflect_action_chunk 再继续动作。
+当前没有 Python worker、分割、IK 或笛卡尔运动规划接口。
 
 ## 任务结束后的自进化
 
 任务执行监督与任务后自进化是两个闭环。结束后由接入的 LLM 看完整任务的
 官方结果、三路视频的时间序列采样、每个 chunk 的 reflection 和实际策略，
-先诊断成功机制或失败原因，再蒸馏成 task skill 文本、code-policy 和 memory
+先诊断成功机制或失败原因，再蒸馏成 task skill 文本、关节控制策略说明和 memory
 候选。成功经验也要保留，不只分析失败。每个候选记录 parent revision、
 视频/frame hash、反馈 hash 和 validation plan，旧版本保持不变。
 

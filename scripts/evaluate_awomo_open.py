@@ -219,7 +219,7 @@ def main():
     p.add_argument('--port-base',type=int,default=45000)
     p.add_argument('--case-timeout',type=int,default=5400)
     p.add_argument('--queue-timeout',type=int,default=2592000)
-    p.add_argument('--segment-actions',type=int,choices=range(10,101),default=40)
+    p.add_argument('--segment-actions',type=int,choices=range(1,41),default=40)
     p.add_argument('--model',choices=SUPPORTED_MODELS,default='gpt-6-astra')
     p.add_argument('--tasks',nargs='+')
     p.add_argument('--seeds',type=int,nargs='+')
@@ -232,9 +232,6 @@ def main():
         raise RuntimeError('Restricted to the verified P6000 node 153')
     if len(set(args.gpus))!=len(args.gpus) or not 1<=len(args.gpus)<=8:
         raise ValueError('Choose one to eight distinct GPUs')
-    runtime=Path(os.environ['ROBODOJO_CODE_POLICY_RUNTIME'])
-    if 'awomopaw.subtask-boundary/v1' not in (runtime/'worker.py').read_text():
-        raise ValueError('Updated bounded worker is required')
     tasks,cases=inventory(args.sim_root)
     baseline_manifest=read(args.baseline/'manifest.json')
     verify_inventory(cases,baseline_manifest['cases'])

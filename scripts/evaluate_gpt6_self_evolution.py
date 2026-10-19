@@ -41,24 +41,11 @@ def main():
     p.add_argument('--case-timeout', type=int, default=5400)
     p.add_argument('--resume', action='store_true')
     p.add_argument('--learning-mode', choices=['task-artifacts', 'failure-only'], default='task-artifacts')
-    p.add_argument('--segment-actions', type=int, choices=range(10, 101), default=40)
+    p.add_argument('--segment-actions', type=int, choices=range(1, 41), default=40)
     p.add_argument('--task-artifact', type=Path, help='Explicit same-task learned skill from an earlier run')
     args=p.parse_args()
     if os.environ.get('P6000_ABLATION_VERIFIED_NODE') != control.NODE or args.sim_root != Path('/opt/robodojo'):
         raise RuntimeError('Restricted to the verified P6000 node 153')
-    # Generated code is part of both benchmark arms' original tool contract.
-    # Reject a broken deployment before creating/starting a scored episode.
-    required_runtime = ['ROBODOJO_CODE_POLICY_RUNTIME', 'ROBODOJO_CODE_POLICY_PYTHON', 'ROBODOJO_PRIMITIVES_PATH']
-    missing = [key for key in required_runtime if not os.environ.get(key)]
-    if missing:
-        raise RuntimeError('Missing generic code-runtime deployment variables: ' + ', '.join(missing))
-    runtime = Path(os.environ['ROBODOJO_CODE_POLICY_RUNTIME'])
-    if not all((runtime / name).is_file() for name in ['contract.py', 'worker.py']):
-        raise RuntimeError('Generic code runtime is incomplete')
-    if args.learning_mode=='task-artifacts' and 'awomopaw.subtask-boundary/v1' not in (runtime/'worker.py').read_text():
-        raise RuntimeError('Install the subtask-boundary worker before task-artifacts runs')
-    if not Path(os.environ['ROBODOJO_PRIMITIVES_PATH']).is_dir() or not os.access(os.environ['ROBODOJO_CODE_POLICY_PYTHON'], os.X_OK):
-        raise RuntimeError('Generic code runtime assets/interpreter are unavailable')
     args.output=args.output.resolve()
     args.output.mkdir(parents=True, exist_ok=args.resume)
     cases=control.inventory(args.sim_root)

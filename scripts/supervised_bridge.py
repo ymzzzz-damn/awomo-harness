@@ -59,18 +59,11 @@ class SupervisedManager(RoboDojoRunManager):
 
     def submit_direct_action_chunk(self, payload):
         with self._lock:
-            # The delegated code worker owns its primitives; VLA/WAM inference
-            # stays disabled by the parent manager while it is running.
-            if not self.code_policy_running():
-                self.supervisor.require('gpt', super().current_observation())
+            self.supervisor.require('gpt', super().current_observation())
             chunk = super().submit_direct_action_chunk(payload)
             self.supervisor.ready(chunk)
             return chunk
 
-    def start_code_policy(self, payload):
-        with self._lock:
-            self.supervisor.require('gpt', super().current_observation())
-            return super().start_code_policy(payload)
 
     def execute_action_chunk(self, chunk_id, max_actions=None, discard_remaining=False):
         with self._lock:
@@ -123,8 +116,6 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port', type=int, default=8098)
     args = parser.parse_args()
-    # Delegated workers must call this bridge, including isolated test ports.
-    os.environ['ROBODOJO_CODE_BRIDGE_URL'] = f'http://127.0.0.1:{args.port}'
     uvicorn.run(supervised_app(SupervisedManager(RoboDojoAdapterConfig.from_env())),
                 host='127.0.0.1', port=args.port)
 
