@@ -48,7 +48,7 @@ PYTHON_BIN="${policy_uv_env_path}/.venv/bin/python"
 exec env \
     PYTHONUNBUFFERED=1 \
     PYTHONWARNINGS=ignore::UserWarning \
-    PYTHONPATH="${ROBODOJO_CLIENT_PYTHONPATH:+${ROBODOJO_CLIENT_PYTHONPATH}:}${BENCH_ROOT}:${policy_uv_env_path}/src" \
+    PYTHONPATH="${BENCH_ROOT}:${policy_uv_env_path}/src" \
     CUDA_VISIBLE_DEVICES="${policy_gpu_id}" \
     "${PYTHON_BIN}" "${XPL_ROOT}/setup_policy_server.py" \
         --config_path "${yaml_file}" \

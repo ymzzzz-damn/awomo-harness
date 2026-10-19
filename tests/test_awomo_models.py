@@ -33,7 +33,7 @@ def test_model_identity_rejects_silent_fallback(model):
     assert not model_matches(model,model+'other')
 
 
-@pytest.mark.parametrize('model',['gpt-5.5-2026-04-23','gpt-5.6-sol'])
+@pytest.mark.parametrize('model',['gpt-6-astra','gpt-5.5-2026-04-23','gpt-5.6-sol'])
 def test_agent_factory_and_vision_resolver_use_process_profile(monkeypatch,model):
     import qwenpaw.config.config as configuration
     from qwenpaw.config.config import AgentProfileConfig

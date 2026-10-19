@@ -1,11 +1,12 @@
 {
   "date": "2026-10-19",
-  "scope": "direct joint control deployment; not model task-success evaluation",
-  "source_parent": "dd1ee017d39682857894512f013547a285b3fdd5",
+  "scope": "Portable GPT direct-control learning loop deployment; no live GPT task-success claim",
+  "source_parent": "cfee1f143920603fe723d121a7a25c18bee4ad8d",
   "regression": {
-    "passed": 127,
+    "passed": 135,
     "deselected": 2,
-    "reason": "independent JetRover hardware-package cases"
+    "reason": "independent JetRover hardware-package cases",
+    "environment": "Fresh full dependency installation; 135 passed, 2 independent hardware cases deselected"
   },
   "packaging": {
     "agent_wheel_built": true,
@@ -25,6 +26,97 @@
     "task_success_claim": false,
     "primitive_provider_loaded": false,
     "test_behavior": "repeat observed joint targets through direct-action chunks until the native action budget ends",
-    "environment_qualification": "Used an isolated checkout with an existing installed RoboDojo/Isaac environment and official assets; not a fresh CUDA/Isaac binary installation."
-  }
+    "environment_qualification": "Used an isolated checkout with an existing installed RoboDojo/Isaac environment and official assets; not a fresh CUDA/Isaac binary installation.",
+    "subtask_supervision": true,
+    "nonterminal_three_camera_reviews": 4,
+    "camera_videos": 3,
+    "video_frames_sampled": 15,
+    "video_timestamps_verified": true,
+    "run_id": "20261019T093014Z-0dafcc28",
+    "transport_python": "3.10.12",
+    "framework_transport_numpy": "2.2.6",
+    "native_result": {
+      "success_rate": 0.0,
+      "eval_time": 1,
+      "score": 0.0,
+      "details": {
+        "0": {
+          "layout_id": 0,
+          "success": false,
+          "score": 0.0
+        }
+      }
+    },
+    "videos": [
+      {
+        "sha256": "03bf0cf1f23f2f837014b95af225dccab5b61867b3dfcbf92479f7f4c0596536",
+        "width": 640,
+        "height": 480,
+        "nb_read_frames": "7"
+      },
+      {
+        "sha256": "bf0711071688ed415fff1b5bda8859cd1390112bc5d52a0811f83bcb36781174",
+        "width": 640,
+        "height": 480,
+        "nb_read_frames": "7"
+      },
+      {
+        "sha256": "688449c978de1724b29ee68fbaa471c2748f7dc8115c11e3224f53fdf846d33c",
+        "width": 640,
+        "height": 480,
+        "nb_read_frames": "7"
+      }
+    ]
+  },
+  "qwenpaw_base": {
+    "commit": "e6e0dcd85b11212d3bf945a724adc295baa03902",
+    "tracked_files": 1472,
+    "missing_files": 0
+  },
+  "learning_loop": {
+    "entrypoint": "scripts/run_learning_loop.py",
+    "portable_task_seed_layout_gpu": true,
+    "both_outcomes_reviewed": true,
+    "all_three_cameras_and_timestamps_checked": true,
+    "failure_success_failure_reuse_regression": true,
+    "reflection_failure_resume_without_episode_replay": true,
+    "committed_distillation_recovery": true,
+    "success_artifacts": [
+      "SKILL.md",
+      "memory.json",
+      "task-artifact.json"
+    ],
+    "live_gpt_api_called": false,
+    "success_branch_test_source": "Controlled official-outcome fixtures and model responses, not a native manipulation success",
+    "live_api_limitation": "No usable GPT provider credentials were present in the inspected local AwomoPaw configuration."
+  },
+  "clean_install": {
+    "python": "3.10.12",
+    "platform": "Linux x86_64",
+    "complete_dependencies_installed": true,
+    "pip_check": "No broken requirements found.",
+    "cli_help_passed": true,
+    "isolated_agent_dry_run_passed": true,
+    "live_model_probe": false,
+    "credentials_for_dry_run": "Isolated dummy credential; no API request",
+    "constraints": "requirements/linux-py310-tested.txt",
+    "versions": {
+      "agentscope": "1.0.19.post1",
+      "agentscope-runtime": "1.1.4",
+      "numpy": "2.2.6",
+      "mcp": "1.30.0",
+      "fastmcp": "2.14.7",
+      "agent-client-protocol": "0.9.0",
+      "openai": "3.35.1",
+      "h5py": "3.16.0",
+      "opencv-python-headless": "4.14.0.94"
+    }
+  },
+  "resolved_installation_issues": [
+    "ReMe requires NumPy >=2.2.6; use compatible NumPy 2/OpenCV transport dependencies",
+    "AgentScope 1.0.19 requires MCP 1 and FastMCP 2",
+    "Existing ACP agent API requires agent-client-protocol 0.9",
+    "Transport interpreter dependency preflight includes h5py",
+    "Keep Isaac client overlay out of the separate framework transport interpreter"
+  ]
 }

@@ -40,6 +40,8 @@ awomopaw --help
 
 部署配置见 [`docs/runtime.md`](docs/runtime.md)。完整性核对见 [`docs/source-completeness.md`](docs/source-completeness.md)，逐文件 SHA-256 清单见 [`SOURCE_MANIFEST.json`](SOURCE_MANIFEST.json)。
 
+通用运行入口是 `python scripts/run_learning_loop.py --help`。配置仿真器与 GPT provider 后，可指定 task、seed、layout 和 GPU；入口自动执行三路视频复盘、成功技能蒸馏和下一场同任务复用，并支持 `--resume`。完整命令见 [运行完整学习循环](docs/runtime.md#5-运行完整学习循环)。
+
 ## 源码范围与依赖
 
 本次完整源码以 QwenPaw `e6e0dcd85b11212d3bf945a724adc295baa03902` 为基础，包含已发布的 AwomoPaw 修改，并同步本地近期的评测、学习和查看器代码。上游许可证与声明保存在 `source/LICENSE`、根目录 `LICENSE` 和 `NOTICE`。`patches/awomopaw.patch` 保留用于追溯原有修改；日常安装直接使用 `source/`。

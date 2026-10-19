@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import shutil
 import shlex
+import subprocess
 import sys
 
 
@@ -27,6 +28,12 @@ def main():
                 'XPolicyLab/utils/setup_env_client.sh', 'src/eval_client/main.py']
     if not python.is_file() or any(not (root / path).is_file() for path in required):
         raise SystemExit('RoboDojo/XPolicyLab checkout or transport Python is incomplete')
+    check = subprocess.run([str(python), '-c',
+        'import h5py, numpy, cv2, msgpack, msgpack_numpy; import websockets.asyncio.server'],
+        capture_output=True, text=True)
+    if check.returncode:
+        raise SystemExit('Transport Python dependencies are incomplete. Install source[transport] '
+                         'in that interpreter before wiring:\n'+check.stderr[-2500:])
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     adapter = root / 'XPolicyLab/policy/GPT6_Harness_Ablation'

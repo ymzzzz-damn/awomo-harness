@@ -4,17 +4,20 @@
 
 ## 1. 安装 AwomoPaw
 
-建议 Linux、Python 3.11。框架也支持 Python 3.10–3.13，仿真环境按 RoboDojo 要求使用 Python 3.11。
+建议 Linux；本次框架洁净安装使用 Python 3.10，独立仿真环境使用 Python 3.11。框架声明支持 Python 3.10–3.13，其余版本未逐一做洁净环境验证。
 
 ```bash
 git clone https://github.com/ymzzzz-damn/awomo-harness.git
 cd awomo-harness
-PYTHON_BIN=python3.11 bash scripts/install.sh
+PYTHON_BIN=python3.10 bash scripts/install.sh
 source .venv/bin/activate
-python -m pip install -e './source[transport]'
 awomopaw --help
 python scripts/verify_source_manifest.py
 ```
+
+安装脚本同时安装 `[simulation,transport]`，包括 h5py、OpenCV、WebSocket 和消息序列化依赖。ReMe 要求 NumPy >=2.2.6，因此框架传输环境使用 NumPy 2 和支持它的 OpenCV，不能套用旧的 numpy<2 限制。Isaac 的 Python 与此环境独立。当前 AgentScope 固定版本使用 MCP 1 接口，因此还限制 mcp<2、fastmcp<3，避免新主版本导致 agent 启动失败；ACP 客户端限制在 0.9 系列，保留当前 agent 需要的 SetSessionModelResponse 接口。
+
+Linux x86_64 / Python 3.10 安装会自动使用 `requirements/linux-py310-tested.txt` 中实际验证的依赖版本。其他环境按 pyproject 约束解析。需要指定另一份约束时可设置 `INSTALL_CONSTRAINTS=/absolute/path/constraints.txt`。
 
 主安装包已包含 `qwenpaw`、`embodiments` 加载器和 RoboDojo 描述文件，不再要求另装本地 `file:./embodiments` 依赖。`embodiments` extra 保留为兼容名称。独立的 `source/embodiments` 包仍可单独构建，其 wheel 也包含描述文件；通常无需再安装一次。
 
@@ -88,6 +91,48 @@ python scripts/configure_robodojo.py \
 5. 读取新画面与关节反馈，再规划下一块。启用子任务监督时先完成 `reflect_action_chunk`。
 6. 原生 episode 结束后，从 `evaluation_result` 读取结果。
 
-项目内的 `run_gpt6_harness_agent.py` 可用于记录配置好的 agent 的运行；它要求一个有效的 `AgentProfileConfig` JSON（包含 active_model 和启用的 robodojo_sim embodiment），可用 `--dry-run` 检查工具加载。评测批处理脚本仍保留原 P6000 节点、库存和基线约束，不应直接作为通用安装入口。
+## 5. 运行完整学习循环
+
+使用通用入口 `scripts/run_learning_loop.py`。它自行启动并清理每场任务的桥接和 agent；无需旧 baseline、固定机器 IP 或两块 GPU。第 3 节只需完成接线，运行此入口时不用另外启动手动桥接。
+
+先配置支持图片与 Responses API 的 GPT provider，例如 `awomopaw models config-key openai`（也可执行 `awomopaw models config` 交互配置）。凭据由本机 AwomoPaw 管理。若使用自定义配置目录，执行以下命令前设置 `AWOMOPAW_WORKING_DIR` 和 `AWOMOPAW_SECRET_DIR`，与配置 provider 时一致。
+
+```bash
+# 检查场景、Python 依赖、实际 agent 工具，以及一次图片 API 调用。
+# 不启动 Isaac，不消耗官方任务动作。
+python scripts/run_learning_loop.py \
+  --sim-root /absolute/path/RoboDojo \
+  --registry "$PWD/runtime-state/demo/registry.json" \
+  --output "$PWD/runtime-state/align-development" \
+  --task align_blocks --seeds 0 --layouts 0 1 \
+  --provider openai --model gpt-6-astra --gpu 0 \
+  --dry-run --probe-model
+
+# 使用同一配置正式运行；--resume 复用已通过的预检目录。
+python scripts/run_learning_loop.py \
+  --sim-root /absolute/path/RoboDojo \
+  --registry "$PWD/runtime-state/demo/registry.json" \
+  --output "$PWD/runtime-state/align-development" \
+  --task align_blocks --seeds 0 --layouts 0 1 \
+  --provider openai --model gpt-6-astra --gpu 0 --resume
+```
+
+`--provider` 是本机配置好的 provider ID。已有 agent 配置时可用 `--agent-config /absolute/path/agent.json` 代替 `--provider`；入口只读取其中的 `active_model`，建立隔离的运行配置。`--model` 的支持范围可由 `--help` 查看，控制与视频复盘使用同一模型并校验返回身份。模型服务需实际提供所选模型。
+
+每场任务依次完成：
+
+1. 冻结此前同任务经验，GPT 从三路当前 RGB、关节状态和官方指令生成直接动作。
+2. 执行最多 `--segment-actions` 步（默认 40，可设 1–40）。非终止片段后必须看三路当前图片并提交子任务反思，才能继续运动。
+3. 等待官方评分和三路完整 MP4；校验 task、run ID、layout、结果与视频哈希。
+4. **成功与失败均复盘**：默认从每路视频抽取最多 5 帧，保留真实时间戳，并结合公开动作历史、执行记录生成分析、修正建议与任务记忆。
+5. **成功时蒸馏** `SKILL.md`、`memory.json`、`task-artifact.json`。失败更新经验；若已有成功技能，则保留技能并更新失败反馈。下一场同任务必须读取完整经验及这三个产物，随后根据当前场景生成策略。
+
+这些是上下文技能和记忆，不是模型权重训练。顺序为 seed 列表内的 layout 列表；可用 `--seeds 0 1 --layouts 0 1` 跨 seed 复用，同一个输出目录只对应一个 task。
+
+输出中的 `status.json` 记录阶段和已复盘数量，`results.json` 保存官方结果。每场在 `seed-N/layout-NN/self_evolving/` 下保存三路视频、动作/模型审计、子任务反思；视频分析与成功技能位于 `task-learning/attempt-NNN/`，`task-learning/receipt.json` 指向完成的分析，根目录 `experience.json` 指向最新同任务技能。
+
+再次运行相同正式命令并带 `--resume`，会校验配置、场景、经验和产物哈希。视频复盘接口中断后，只补做未完成的复盘，不重新执行已经评分的任务。未完成或未评分的仿真任务会停止并报告错误，须先检查日志；入口不会静默重跑。成功/失败视频缺失或复盘失败时状态为 `needs_attention`，不会冒充完成或跳到下一场。
+
+复用另一轮已有成功技能时，在新输出目录的命令中增加 `--task-artifact /absolute/path/task-artifact.json`，保留它同目录下的 `SKILL.md` 和 `memory.json`。task 与内容哈希必须匹配。历史 `evaluate_gpt6_self_evolution.py`、open 批处理脚本仍用于原实验约束；通用部署使用本节入口。
 
 移除 IK/分割后，GPT 需要自行从图像和关节反馈生成动作。部署链路可用不代表操作任务能够成功；不要把链路 smoke test 的结果记成模型任务成功率。

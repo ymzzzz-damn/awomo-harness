@@ -63,7 +63,8 @@ class GPT6AblationManager(FixtureManager):
         obs=super().current_observation()
         self._sync_subtask(obs)
         if getattr(self,'subtask_gate',None):
-            return {**obs,'subtask_supervision':self.subtask_gate.public()}
+            return {**obs,'subtask_supervision':{
+                **self.subtask_gate.public(), 'max_actions': self.segment_actions}}
         return obs
 
     def current_observation_image(self, topic):
@@ -218,9 +219,6 @@ def main():
             try:return manager.reflect_subtask(request.model_dump())
             except (ValueError,AdapterConfigurationError) as error:
                 raise HTTPException(status_code=409,detail=str(error)) from error
-    try:
-        uvicorn.run(app,host='127.0.0.1',port=args.port)
-    finally:
-        manager.stop_code_policies()
+    uvicorn.run(app,host='127.0.0.1',port=args.port)
 
 if __name__=='__main__':main()

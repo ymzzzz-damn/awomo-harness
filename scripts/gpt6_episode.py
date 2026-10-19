@@ -112,7 +112,7 @@ def run_case(case, arm, gpu, args):
     endpoint = 'http://127.0.0.1:' + str(port)
     bridge = agent = None
     runs = []
-    python = str(args.awomopaw / '.venv/bin/python')
+    python = str(getattr(args, 'python', None) or args.awomopaw / '.venv/bin/python')
     deadline = time.monotonic() + args.case_timeout + 120
     def call(path, payload=None):
         return base.api(endpoint, path, payload, timeout=30)
@@ -189,8 +189,18 @@ def run_case(case, arm, gpu, args):
             runs.append(state)
         row.update(run_id=state['run_id'], evaluator_pid=state.get('pid'))
         base.save(dest/'run.json', state)
+        # The final action receipt can precede native video/result finalization.
+        # Wait only for an episode that has actually exhausted its action stream.
         if state['status'] in {'starting', 'running'}:
-            raise RuntimeError('Agent returned before its episode ended')
+            terminal = call('/v1/sessions/status')
+            if not terminal.get('episode_end'):
+                raise RuntimeError('Agent returned before its episode ended')
+            result_deadline = min(deadline, time.monotonic() + 120)
+            while state['status'] in {'starting', 'running'} and time.monotonic() < result_deadline:
+                time.sleep(2)
+                state = call('/v1/evaluations/current')
+            if state['status'] != 'completed':
+                raise RuntimeError('Native episode result finalization failed')
         official = call('/v1/evaluations/result?run_id='+state['run_id'])
         base.save(dest/'official-result.json', official)
         native = official['run']['result']

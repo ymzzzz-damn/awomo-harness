@@ -121,10 +121,11 @@ def learning_eligibility(case_dir, *, allow_success=False):
         return {'eligible': False, 'infrastructure_error': True, 'reason': 'Deployment/interface failure', 'signatures': faults}
     traces = [json.loads(line) for line in (case_dir/'harness-trace.jsonl').read_text().splitlines()]
     actions = max((e.get('action_count',0) for e in traces), default=0)
-    if actions == 0:
+    if actions == 0 and not allow_success:
         return {'eligible': False, 'infrastructure_error': False, 'reason': 'No executed motion; no physical task lesson', 'actual_actions': 0}
     return {'eligible': True, 'infrastructure_error': False,
-            'reason': 'Executed manipulation with official ' + ('success' if row['success'] else 'failure'), 'actual_actions': actions}
+            'reason': ('Executed manipulation' if actions else 'No motion; review must state this limitation') +
+                      ' with official ' + ('success' if row['success'] else 'failure'), 'actual_actions': actions}
 
 
 def working_memory_view(memory):
@@ -239,10 +240,26 @@ def failure_evidence(case_dir, *, allow_success=False, output=None):
     trace = [json.loads(line) for line in (case_dir/'harness-trace.jsonl').read_text().splitlines()]
     # Whitelist public execution metadata, never pass arbitrary simulator state.
     keys = {'event','time','action_count','executed','source','subtask_goal','planning_summary',
-            'validation_errors','error','reason','episode_end','official_instruction'}
+            'validation_errors','error','reason','episode_end','official_instruction',
+            'chunk_id','observation_id','max_actions','discarded_actions','outcome'}
     selected = [trace[i] for i in select_indices(len(trace))] if trace else []
     selected += [e for e in trace if e.get('error') or e.get('validation_errors')][-10:]
     selected += trace[-12:]
+    direct_actions = []
+    direct_budget = 28000
+    messages = case_dir/'agent-messages.jsonl'
+    for line in messages.read_text().splitlines() if messages.exists() else []:
+        content = json.loads(line).get('message', {}).get('content', [])
+        for block in content if isinstance(content, list) else []:
+            name = block.get('name', '')
+            if block.get('type') != 'tool_use' or name not in {
+                'robodojo_sim__submit_direct_action_chunk', 'robodojo_sim__execute_action_chunk',
+                'robodojo_sim__reflect_action_chunk'}:
+                continue
+            encoded = json.dumps(dict(name=name, input=block.get('input', {})), ensure_ascii=False)
+            if len(encoded) <= direct_budget:
+                direct_actions.append(json.loads(encoded))
+                direct_budget -= len(encoded)
     policies = []
     remaining_source_chars = 28000
     remaining_feedback_chars = 8000
@@ -275,7 +292,8 @@ def failure_evidence(case_dir, *, allow_success=False, output=None):
                 'trace_sha256': digest(case_dir/'harness-trace.jsonl'),
                 'event_counts': dict(Counter(e.get('event') for e in trace)),
                 'trajectory_samples': [{k: v for k, v in e.items() if k in keys} for e in selected],
-                'workers': policies, 'frames': frames}
+                'workers': policies, 'direct_action_history': direct_actions,
+                'direct_action_history_budget_characters': 28000, 'frames': frames}
     if receipt.get('model'):
         evidence['controller_model']=receipt['model']
     save(out/'evidence.json', evidence)

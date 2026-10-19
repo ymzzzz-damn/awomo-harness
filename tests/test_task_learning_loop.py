@@ -128,6 +128,56 @@ def test_failure_analysis_cannot_publish_success_mechanisms_or_skill():
         validate_rethinking(value,{'cam_head:0'},False)
 
 
+def test_official_zero_motion_outcome_still_gets_three_camera_review(tmp_path, case_factory):
+    case = case_factory(0, False)
+    (case/'harness-trace.jsonl').write_text(json.dumps(dict(event='terminal', action_count=0))+'\n')
+    snap = tmp_path/'snapshot.json'
+    save(snap, empty_task_memory('zero-motion', 'align_blocks'))
+    async def model(evidence, *args):
+        assert len(evidence['frames']) == 9
+        return analysis(False)
+    memory = asyncio.run(learn(case, snap, None, tmp_path/'review', model_analysis=model))
+    assert memory['version'] == 1 and memory['task_artifact'] is None
+
+
+def test_video_analyzer_sends_all_cameras_and_checks_returned_model(tmp_path, case_factory, monkeypatch):
+    from qwenpaw.providers import ProviderManager
+    import gpt6_task_learning as learning
+    calls = []
+    class Response:
+        model = 'gpt-6-astra'
+        id = 'test-response'
+        output_text = json.dumps(analysis(True))
+        def model_dump(self, **kwargs):
+            return dict(model=self.model, id=self.id, output_text=self.output_text)
+    class Client:
+        def __init__(self):
+            self.responses = self
+        def with_options(self, **kwargs):
+            return self
+        async def create(self, **kwargs):
+            calls.append(kwargs)
+            return Response()
+        async def close(self):
+            pass
+    provider = SimpleNamespace(_client=lambda **kwargs: Client())
+    monkeypatch.setattr(ProviderManager, 'get_instance', lambda: SimpleNamespace(get_provider=lambda _: provider))
+    config = tmp_path/'agent.json'
+    save(config, dict(active_model=dict(model='gpt-6-astra', provider_id='test')))
+    snapshot = tmp_path/'snapshot.json'
+    save(snapshot, empty_task_memory('api-contract', 'align_blocks'))
+    case = case_factory(0, True)
+    memory = asyncio.run(learn(case, snapshot, config, tmp_path/'learned-api'))
+    assert memory['task_artifact']
+    request = calls[0]
+    images = [c for c in request['input'][0]['content'] if c['type'] == 'input_image']
+    assert len(images) == 9 and all(c['image_url'].startswith('data:image/jpeg;base64,') for c in images)
+    assert request['text']['format']['strict'] is True
+    Response.model = 'another-model'
+    with pytest.raises(RuntimeError, match='model mismatch'):
+        asyncio.run(learn(case, snapshot, config, tmp_path/'wrong-model'))
+
+
 def obs(index=0):
     return dict(run_id='same-run',observation_id=f'observation-{index}',episode_end=False,action_count=index)
 

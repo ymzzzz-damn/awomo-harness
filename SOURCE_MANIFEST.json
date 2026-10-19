@@ -1,6 +1,6 @@
 {
   "project": "AwomoPaw",
-  "scope": "Complete QwenPaw/AwomoPaw framework with direct joint-control RoboDojo integration",
+  "scope": "Complete QwenPaw/AwomoPaw framework, direct control and portable video-review learning loop",
   "external_base": {
     "repository": "https://github.com/agentscope-ai/QwenPaw",
     "commit": "e6e0dcd85b11212d3bf945a724adc295baa03902"
@@ -30,13 +30,13 @@
     },
     {
       "path": "README.md",
-      "sha256": "89ba0c97f563b848907dafe46268c07064a5b9337cd1251f6d54d4af16f77a2b",
-      "bytes": 3699
+      "sha256": "380ecf2828aa31f0856529e70df24c09568e53256548c4361cfbbd8b5b362827",
+      "bytes": 4048
     },
     {
       "path": "docs/deployment-validation.json",
-      "sha256": "3ca86f829e03bf36176ff86cf99c94b365bba4311ebf64ffb7e8907bd363c79a",
-      "bytes": 1217
+      "sha256": "acac0306115c5a1ef14d8490fc71d85ca76f374e0f72ebbb106539e0757e5bec",
+      "bytes": 4427
     },
     {
       "path": "docs/ownership.json",
@@ -45,13 +45,13 @@
     },
     {
       "path": "docs/runtime.md",
-      "sha256": "5caaa16a56e053d200632ee912f7d9dbba510a217b803c35f5080862087ec170",
-      "bytes": 5644
+      "sha256": "b7b51ba1ff2a12c6f5fe026d837299403a164448215ed0c1b7e61556d7797306",
+      "bytes": 10106
     },
     {
       "path": "docs/source-completeness.md",
-      "sha256": "3cb463f159bc7b5be7f8d6c752e98449d48b80c9668888598af280bea0d67176",
-      "bytes": 1719
+      "sha256": "9f9f8005e6793628ebc881dff79ebc549bc62bbc24d756e41aec6ab234758d0f",
+      "bytes": 2522
     },
     {
       "path": "embodiments/robodojo_sim/EMBODIMENT.md",
@@ -67,6 +67,11 @@
       "path": "patches/awomopaw.patch",
       "sha256": "7a6f65623f6835cd21fd5526f547103da3001a74af6eefc6fe285ca88b733a85",
       "bytes": 233167
+    },
+    {
+      "path": "requirements/linux-py310-tested.txt",
+      "sha256": "cace9dcf2dfcf60dedbe448c412f31150fb22d00b3d519dc9baf3d3534ae7b1b",
+      "bytes": 5413
     },
     {
       "path": "robodojo-overlay/XPolicyLab/policy/Awomopaw_Harness/__init__.py",
@@ -140,8 +145,8 @@
     },
     {
       "path": "runtime/gpt6-harness-ablation-adapter/setup_eval_policy_server.sh",
-      "sha256": "98e7304cae407ed5a7d923106f2baed8ee1126e56665ba4123832117c28457b7",
-      "bytes": 2194
+      "sha256": "8e18a86203e755a585a9c4b3c9b5d5ddabea2854ae99d86c1c8cdb8b1a5d86fa",
+      "bytes": 2133
     },
     {
       "path": "scripts/apply_awomopaw.py",
@@ -160,8 +165,8 @@
     },
     {
       "path": "scripts/configure_robodojo.py",
-      "sha256": "513db02751f9412a7413b3b9f33325fdc1ef042bfa94e98879f0fb5b1919a847",
-      "bytes": 3428
+      "sha256": "5df7df696b458238815dcf56c1f1b085a4037c7f9580de7c1511f782c1459744",
+      "bytes": 3838
     },
     {
       "path": "scripts/evaluate_awomo_open.py",
@@ -175,18 +180,18 @@
     },
     {
       "path": "scripts/gpt6_ablation_bridge.py",
-      "sha256": "2975bcf49b34a533cbccab7c23f1556a1c81d3d86d275f0a351588f767b5e77d",
-      "bytes": 12194
+      "sha256": "50509217f6b18dd26a480850d4edec0d8f8f314e8861d8fd988446f1f738da74",
+      "bytes": 12189
     },
     {
       "path": "scripts/gpt6_episode.py",
-      "sha256": "9757123521d96c45220b96a511f5098c28072e9d10bb49b66d26f03e4230be38",
-      "bytes": 15715
+      "sha256": "737abfe1e017f42df786a04245f725199fbd443c711e83628eaa029ba6bb51f8",
+      "bytes": 16396
     },
     {
       "path": "scripts/gpt6_failure_learning.py",
-      "sha256": "bd07d8a871ff283c53feebcf62091a2e8570926c1a70dcaa4170ad4b690a7fc3",
-      "bytes": 21688
+      "sha256": "c3af53aa3616088876230f57789272ba75eca0a23070a9d1ba9041223b96fa0a",
+      "bytes": 22845
     },
     {
       "path": "scripts/gpt6_task_learning.py",
@@ -210,8 +215,8 @@
     },
     {
       "path": "scripts/install.sh",
-      "sha256": "3bf75b1f44307954a7da50c72a79cb2d3526b43052a56b630e3cd21d39a6e821",
-      "bytes": 588
+      "sha256": "eba041b02cae2ff6fee37329f0f3ea12ee902cc21d8d739f88f4bd3272cc5d6e",
+      "bytes": 1091
     },
     {
       "path": "scripts/install_sim_transport.sh",
@@ -225,8 +230,13 @@
     },
     {
       "path": "scripts/run_gpt6_harness_agent.py",
-      "sha256": "27eb94ff19715c1a777b8d61e2a8dda089c08a22e414e0148d25fc7bcb302bbe",
-      "bytes": 18077
+      "sha256": "2064ed606b2e96b2e4e9d50abce8fdf6180375bcf1f00a8f3f6c48babcd54ee3",
+      "bytes": 18026
+    },
+    {
+      "path": "scripts/run_learning_loop.py",
+      "sha256": "5a6c6da2cb24ad63640b8936a22a243e39bbab766649d6ac45e46d13f582d20a",
+      "bytes": 13121
     },
     {
       "path": "scripts/smoke_direct_control.py",
@@ -305,8 +315,8 @@
     },
     {
       "path": "source/.gitattributes",
-      "sha256": "65b1023623fb87849b0d7e7a39141bd9d2662d98dcd55fefc9e8bf1683d2d934",
-      "bytes": 20
+      "sha256": "c289641b919d49ece798dbb35e798d4b632c92acb69a21b04899ff6e6ddf39ec",
+      "bytes": 116
     },
     {
       "path": "source/.github/ISSUE_TEMPLATE/1-question.md",
@@ -2320,8 +2330,8 @@
     },
     {
       "path": "source/pyproject.toml",
-      "sha256": "fbfcd68d86b9194b7794bdca14531526c31689a2475c06faf4aab9c8c90fc895",
-      "bytes": 4128
+      "sha256": "55e43d12eabdc2f45610399e4646e128adb52310ba1c8016d02b62976a3c2fd4",
+      "bytes": 4249
     },
     {
       "path": "source/scripts/README.md",
@@ -7895,8 +7905,8 @@
     },
     {
       "path": "tests/test_awomo_models.py",
-      "sha256": "d94a6744165f335c899309adc0268b974d40008253dd5047b2f02eeafb658c92",
-      "bytes": 3673
+      "sha256": "1ca3460d30cd87332c8f3346ab92e2c1a3a980017bd054b0923993726b0c5f76",
+      "bytes": 3687
     },
     {
       "path": "tests/test_awomo_open.py",
@@ -7919,14 +7929,19 @@
       "bytes": 9970
     },
     {
+      "path": "tests/test_portable_learning_loop.py",
+      "sha256": "fb512df598ec6b0036295b185e757f0324da749c42a096e8991b6850284fb382",
+      "bytes": 6317
+    },
+    {
       "path": "tests/test_rsi_native_ui.py",
       "sha256": "88cfb36c1bfd63059a50690effd2da340ff9b0c071e6d0ee9f6177f738e41271",
       "bytes": 11403
     },
     {
       "path": "tests/test_task_learning_loop.py",
-      "sha256": "1780e8a5a54827c108a42cceeee8852ac86871bf3c21ad445fb7758789470336",
-      "bytes": 9611
+      "sha256": "8673ceb24cd7b12327a0dc683756bacbad269593633d6bdd3c3ad6e8a91fe5be",
+      "bytes": 11985
     },
     {
       "path": "tests/test_trajectory_ui.py",
@@ -7967,7 +7982,7 @@
     }
   },
   "snapshot_date": "2026-10-19",
-  "parent_github_commit": "dd1ee017d39682857894512f013547a285b3fdd5",
+  "parent_github_commit": "cfee1f143920603fe723d121a7a25c18bee4ad8d",
   "packaging": "Complete assembled source under source/; no separate upstream checkout is required",
   "source_counts": {
     "upstream_paths": 1472,
@@ -7975,5 +7990,6 @@
     "assembled_files": 1520,
     "qwenpaw_package_files": 801
   },
-  "control_path": "Public RGB/proprioception -> GPT-authored explicit joint chunks -> native simulator executor; no generated Python worker or primitive provider"
+  "control_path": "Public RGB/proprioception -> GPT-authored explicit joint chunks -> native simulator executor; no generated Python worker or primitive provider",
+  "learning_loop": "scripts/run_learning_loop.py: both outcomes reviewed; success skill distillation; same-task reuse; resumable post-task processing"
 }
