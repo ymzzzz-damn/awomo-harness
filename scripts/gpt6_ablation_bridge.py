@@ -179,7 +179,7 @@ class GPT6AblationManager(FixtureManager):
         memory=json.loads(Path(fixture['experience_snapshot']).read_text())
         allowed={l['id'] for l in memory.get('active_lessons',[])}
         rationale=' '.join(str(payload.get(k,'')) for k in ['rationale','fallback_reason','subtask_goal'])
-        cited=set(re.findall(r'E\d{2}-L\d{2}',rationale))
+        cited=set(re.findall(r'E\d{2,}-L\d{2}',rationale))
         record={'at':datetime.now(timezone.utc).isoformat(),'version':memory['version'],
                 'kind':kind,'accepted':True,'policy_id':result.get('policy_id'),
                 'cited_lesson_ids':sorted(cited & allowed),'unknown_lesson_ids':sorted(cited-allowed),

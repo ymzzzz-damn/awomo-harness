@@ -8,10 +8,12 @@ import argparse
 import asyncio
 import json
 import hashlib
+import re
 from pathlib import Path
 import time
 
 from harness_utils import save, now
+from harness_models import SUPPORTED_MODELS, checked_model, bind_experiment_profile
 
 COMMON = '''You are the GPT-6 controller in an AwomoPaw RoboDojo harness evaluation.
 Use the exact official instruction, current public RGB cameras and proprioception.
@@ -59,7 +61,15 @@ async def run(args):
     workspace = dest / 'workspace'
     workspace.mkdir(parents=True, exist_ok=True)
     # Both arms have the same common prompt, tool permissions and budgets.
-    common = COMMON
+    task, seed = getattr(args, 'task', 'align_blocks'), getattr(args, 'seed', 0)
+    if not re.fullmatch(r'[A-Za-z][A-Za-z0-9_]{0,127}', task) or type(seed) is not int or seed < 0:
+        raise ValueError('Invalid task or seed')
+    common = COMMON.replace('Start align_blocks seed 0 exactly once', f'Start {task} seed {seed} exactly once')
+    prompt = PROMPT.replace('align_blocks，seed 0', f'{task}，seed {seed}')
+    expected_model=checked_model(getattr(args,'model','gpt-6-astra'))
+    if expected_model!='gpt-6-astra':
+        common=common.replace('GPT-6',expected_model).replace('GPT6',expected_model)
+        prompt=prompt.replace('GPT-6',expected_model)
     experience = getattr(args, 'experience', None)
     task_artifact = None
     artifact_paths = {}
@@ -107,13 +117,15 @@ async def run(args):
         experience_data = None
     (workspace / 'AGENTS.md').write_text(common)
     config = AgentProfileConfig.model_validate(json.loads(args.agent_config.read_text()))
-    if config.active_model.model != 'gpt-6-astra':
-        raise RuntimeError('Expected the user-selected GPT6 model gpt-6-astra')
+    if config.active_model.model != expected_model:
+        raise RuntimeError('Experiment profile differs from the explicitly selected model')
     config.workspace_dir = str(workspace)
     config.running.max_iters = 1200
     config.running.auto_continue_on_text_only = True
     config.running.memory_manager_backend = 'none'
     config.tools = ToolsConfig()
+    if expected_model!='gpt-6-astra':
+        bind_experiment_profile(config)
     for tool in config.tools.builtin_tools.values():
         tool.enabled = False
     embodiment = Path(__file__).resolve().parents[1] / 'embodiments/robodojo_sim'
@@ -147,6 +159,8 @@ async def run(args):
     agent = RecordedAgent(config, embodiment_manager=manager, context_manager=context, workspace_dir=workspace,
         request_context={'agent_id': 'default', 'channel': 'console', 'session_id': dest.name,
                          'user_id': 'gpt6-harness-skills-evaluation'})
+    if agent.model.model_name!=expected_model:
+        raise RuntimeError('Actual agent model differs from selected experiment model: '+agent.model.model_name)
     # Remove implicit orchestration and all non-benchmark tools.
     permitted_ops = ALLOWED | ({'reflect_action_chunk'} if task_learning else set())
     for name in list(agent.toolkit.tools):
@@ -206,18 +220,19 @@ async def run(args):
     agent.toolkit.register_tool_function(read_file)
     save(dest / 'agent-runtime.json', {'agent_class': 'qwenpaw.agents.react_agent.QwenPawAgent',
         'model': config.active_model.model, 'model_provider': config.active_model.provider_id,
+        'actual_model':agent.model.model_name,
         'fresh_memory': True, 'memory_backend': 'none', 'arm': args.arm,
         'context_backend': 'light',
         'tools': list(agent.toolkit.tools), 'skills': list(agent.toolkit.skills),
         'execute_schema': execute,
         'subtask_supervision': task_learning,
         'task_artifact_revision': task_artifact['manifest']['revision'] if task_artifact else None,
-        'common_prompt': common, 'user_prompt': PROMPT,
+        'common_prompt': common, 'user_prompt': prompt, 'task': task, 'seed': seed,
         'experience_version': experience_data.get('version') if experience_data else None,
         'experience_sha256': hashlib.sha256(experience.read_bytes()).hexdigest() if experience else None,
         'experience_source_layouts': [e['source_layout_id'] for e in experience_data['entries']] if experience_data else []})
     (dest / 'system-prompt.txt').write_text(agent.sys_prompt)
-    if args.dry_run:
+    if args.dry_run and not getattr(args,'probe_model',False):
         save(dest / 'agent-finished.json', {'status': 'dry_run', 'no_episode_started': True})
         await manager.close()
         await context.close()
@@ -239,7 +254,26 @@ async def run(args):
     AsyncResponses.create = audited_create
     started = time.monotonic()
     try:
-        reply = await asyncio.wait_for(agent(Msg('user', PROMPT, 'user')), args.timeout)
+        if getattr(args,'probe_model',False):
+            if not args.dry_run:
+                raise ValueError('Model connectivity probes require --dry-run')
+            import base64,io
+            from PIL import Image
+            buf=io.BytesIO();Image.new('RGB',(16,16),'blue').save(buf,format='PNG')
+            pixels='data:image/png;base64,'+base64.b64encode(buf.getvalue()).decode()
+            msg=Msg('user',[
+                {'type':'text','text':'Connectivity probe only. Name the dominant color in this image in English.'},
+                {'type':'image','source':{'type':'url','url':pixels}}],'user')
+            formatted=await agent.formatter.format([msg])
+            response=await asyncio.wait_for(agent.model(formatted),120)
+            reply=response.content
+            save(dest/'framework-model-probe.json',dict(actual_model=agent.model.model_name,content=reply,
+                no_episode_started=True))
+            if 'blue' not in json.dumps(reply).lower():
+                raise RuntimeError('Selected framework model did not receive the probe image')
+            save(dest/'agent-finished.json',dict(status='model_probe_passed',no_episode_started=True))
+            return
+        reply = await asyncio.wait_for(agent(Msg('user', prompt, 'user')), args.timeout)
         save(dest / 'agent-reply.json', reply.to_dict())
         save(dest / 'agent-state.json', agent.state_dict())
         save(dest / 'agent-finished.json', {'status': 'returned', 'seconds': time.monotonic()-started})
@@ -261,7 +295,11 @@ def main():
     parser.add_argument('--skill', type=Path, required=True)
     parser.add_argument('--experience', type=Path)
     parser.add_argument('--timeout', type=int, default=5400)
+    parser.add_argument('--task', default='align_blocks')
+    parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--model',choices=SUPPORTED_MODELS,default='gpt-6-astra')
     parser.add_argument('--dry-run', action='store_true')
+    parser.add_argument('--probe-model',action='store_true')
     asyncio.run(run(parser.parse_args()))
 
 

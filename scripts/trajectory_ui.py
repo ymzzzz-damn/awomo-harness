@@ -96,6 +96,18 @@ class EvidenceStore:
                 if not experiment.is_dir():
                     continue
                 exp = read_json(experiment / 'experiment.json')
+                if exp.get('schema') == 'physicalrsi.native-open-hybrid-view/v1':
+                    from rsi_native_ui import add_native_hybrid
+                    add_native_hybrid(self, experiment, exp)
+                    continue
+                if exp.get('schema') == 'physicalrsi.native-open-results/v1':
+                    continue  # Mirrored raw evidence is shown through its stable UI registration.
+                if exp.get('schema') == 'physicalrsi.open-online-baseline/v1':
+                    self.add_rsi_baseline(experiment, exp)
+                    continue
+                if exp.get('schema') == 'awomopaw.open-online-harness/v1':
+                    self.add_awomo_open(experiment)
+                    continue
                 if exp.get('schema') == 'physicalrsi.online-code-evolution/v1':
                     self.add_online_experiment(experiment, exp)
                     continue
@@ -408,10 +420,73 @@ class EvidenceStore:
                 'frames': sum(len(v['frames']) for v in reflection.get('video_evidence', []))}
         return detail
 
+    def add_awomo_open(self, experiment):
+        seen = set()
+        model=read_json(experiment/'manifest.json').get('model')
+        stopped = (read_json(experiment/'user-requested-stop-for-rsi-hybrid.json').get('stopped') is True
+                   and read_json(experiment/'ui-sync.json').get('backend_alive') is not True)
+        for receipt in sorted((experiment/'tasks').glob('*/seed-*/layout-*/self_evolving/receipt.json')):
+            row = read_json(receipt)
+            row['awomo_open'] = True
+            row['model']=row.get('model') or model
+            key = (row.get('task'), row.get('seed'), row.get('layout_id'))
+            if key in seen:
+                continue
+            official = read_json(receipt.parent/'official-result.json')
+            if (stopped and not row.get('valid_episode') and row.get('status') in {'starting', 'running'}
+                    and not ((official.get('run') or {}).get('result') or {}).get('eval_time')):
+                row = dict(row, status='stopped_by_user',
+                           qualification='已按用户指令停止；此中断执行未评分，不计入成功率。')
+            self.add_scene(experiment, receipt.parent, key[0], row,
+                (official.get('run') or {}).get('result') or {}, key[2], official, receipt)
+            seen.add(key)
+        for case in read_json(experiment/'official-case-inventory.json', []):
+            key = (case['task'], case['seed'], case['layout_id'])
+            if key in seen:
+                continue
+            folder=experiment/'tasks'/key[0]/f'seed-{key[1]}'/f'layout-{key[2]:02d}'/'self_evolving'
+            self.add_scene(experiment, folder, key[0], dict(case, arm='self_evolving', status='pending',
+                provider='gpt6-harness', awomo_open=True,model=model), {}, key[2], {}, experiment/'official-case-inventory.json')
+
+    def add_rsi_baseline(self, experiment, registration):
+        """One primary trial per task/seed/layout; paired controls stay evidence."""
+        seen = set()
+        backend_stopped = read_json(experiment / 'ui-sync.json').get('backend_alive') is False
+        for receipt in sorted((experiment / 'tasks').rglob('receipt.json')):
+            parts = receipt.relative_to(experiment).parts
+            primary_bootstrap = len(parts) == 4 and parts[2] == 'bootstrap'
+            primary_round = len(parts) == 6 and parts[2] == 'rounds' and parts[4] in {'candidate', 'retained'}
+            # Archived attempts and paired incumbents are evidence, not the
+            # current primary trial for this official scene identity.
+            if not (primary_bootstrap or primary_round):
+                continue
+            row = read_json(receipt)
+            if not row.get('run_id'):
+                continue
+            key = (row.get('task'), row.get('seed', 0), row.get('layout_id', 0))
+            if key in seen:
+                continue
+            row['rsi_baseline'] = True
+            if row.get('scene_variant') == 'repaired-native-fixture-v1':
+                row['qualification'] = '修复场景：杂物盒沿 y 方向移动 6.5 厘米。'
+            if backend_stopped and row.get('status') in {'starting', 'running'}:
+                row.update(status='infrastructure_error', valid_episode=False,
+                           error='远端队列已停止，等待恢复；此执行没有计入官方成功率。')
+            official = read_json(receipt.parent / 'official-result.json')
+            self.add_scene(experiment, receipt.parent, key[0], row,
+                           (official.get('run') or {}).get('result') or {}, key[2], official, receipt)
+            seen.add(key)
+        for case in read_json(experiment / 'official-case-inventory.json', []):
+            key = (case['task'], case['seed'], case['layout_id'])
+            if key not in seen:
+                self.add_scene(experiment, experiment, key[0], dict(case, status='pending', rsi_baseline=True), {}, key[2], {},
+                               experiment / 'official-case-inventory.json', suffix=':'.join(map(str, key)))
+
     def add_scene(self, experiment, folder, task, row, result, layout, official, source, suffix=''):
         arm = row.get('arm') or (folder.name if folder.name in {'with_skills', 'without_skills', 'self_evolving'} else None)
         group = experiment.name + '::' + arm if arm else experiment.name
-        key = identifier(f'{group}:{row.get("seed", 0)}:{layout}') if arm else identifier(str(source) + suffix)
+        task_key = ':'+task if row.get('awomo_open') else ''
+        key = identifier(f'{group}{task_key}:{row.get("seed", 0)}:{layout}') if arm else identifier(str(source) + suffix)
         videos = sorted((folder / 'videos').glob('*.mp4'))
         if not videos:
             episode = row.get('native_episode')
@@ -428,8 +503,11 @@ class EvidenceStore:
             if p:
                 cameras[camera] = self.file_url(p)
         self.scenes[key] = {'id': key, 'experiment': group, 'arm': arm, 'task': task, 'seed': row.get('seed', 0),
+            'rsi_baseline': row.get('rsi_baseline', False), 'candidate_id': row.get('candidate_id'),
             'layout': layout, 'status': classify(row, result), 'score': row.get('score', result.get('score')),
-            'provider': row.get('provider') or row.get('provider_id') or row.get('policy_id') or row.get('mode') or 'PhysicalRSI',
+            'provider': ('Awomo · '+row['model']) if row.get('awomo_open') and row.get('model') else
+                row.get('provider') or row.get('provider_id') or row.get('policy_id') or row.get('mode') or 'PhysicalRSI',
+            'model':row.get('model'),
             'run_id': row.get('run_id'), 'actions': row.get('actions', row.get('action_count', 0)),
             'cameras': cameras, 'variant': str(folder.relative_to(experiment)),
             'qualification': ('中断执行的公共 RGB 帧回放，非完整官方评测视频。' if replay else row.get('qualification')),
@@ -440,6 +518,9 @@ class EvidenceStore:
             scene = self.scenes.get(key)
             if not scene:
                 raise KeyError(key)
+            if scene.get('rsi_native_hybrid'):
+                from rsi_native_ui import native_detail
+                return native_detail(self, scene)
             if scene.get('online_code_evolution'):
                 return self.online_detail(scene)
             folder, row, official = scene['_folder'], scene['_row'], scene['_official']
@@ -450,16 +531,32 @@ class EvidenceStore:
                     files.append({'label': label, 'url': url, 'path': str(p)})
             source(scene['_source'], '场景结果')
             source(folder / 'official-result.json', '官方评分')
-            experience = read_json(scene['_experiment'] / 'learning/snapshots' / f'layout-{scene["layout"]:02d}.json')
+            if read_json(scene['_experiment'] / 'experiment.json').get('schema') == 'physicalrsi.open-online-baseline/v1':
+                source(scene['_experiment'] / 'summary.json', '全部任务 · 成功率与覆盖范围')
+                source(folder.parent / 'selection.json', 'RSI · 原版选择器决定')
+                source(folder.parent / 'harness-candidate/policy.py', 'RSI · 本场候选策略')
+                source(folder.parent / 'harness-candidate/memory_rules.json', 'RSI · 本场候选记忆')
+                source(folder.parent / 'development-feedback.json', 'RSI · 上一场反馈')
+                source(folder / 'native-scene-repair-applied.json', '原生场景修复记录')
+                source(folder / 'selected-scene.json', '原生场景与来源')
+                for response in sorted(folder.parent.glob('generation-*/model-response.json')):
+                    source(response, 'RSI · 模型生成记录')
+            experience_path=scene['_experiment']/'learning/snapshots'/f'layout-{scene["layout"]:02d}.json'
+            learning_path=folder/'learning'
+            if row.get('awomo_open'):
+                source(scene['_experiment']/'user-requested-stop-for-rsi-hybrid.json', '用户停止回执')
+                experience_path=scene['_experiment']/'tasks'/scene['task']/'learning/snapshots'/f'case-{row["case_index"]:03d}.json'
+                learning_path=folder/'task-learning'
+            experience = read_json(experience_path)
             if scene.get('arm') == 'self_evolving':
-                source(scene['_experiment'] / 'comparison.json', '与保留的两组基线对比')
-                source(scene['_experiment'] / 'learning/snapshots' / f'layout-{scene["layout"]:02d}.json', '本场景使用的经验')
+                source(scene['_experiment'] / 'comparison.json', '相同官方场景的基线对比')
+                source(experience_path, '本场景使用的经验')
                 source(folder / 'experience-reads.json', '经验读取记录')
-                source(folder / 'learning/analysis.json', '失败原因与新经验')
-                source(folder / 'learning/evidence.json', '失败帧与轨迹来源')
-                source(folder / 'learning/experience-after.json', '传给下一场景的经验')
-                for frame in sorted((folder/'learning/frames').glob('*/*.jpg')):
-                    source(frame, f'失败关键帧 · {frame.parent.name} · {frame.stem}')
+                source(learning_path/'analysis.json', '任务复盘与新经验')
+                source(learning_path/'evidence.json', '复盘帧与轨迹来源')
+                source(learning_path/'experience-after.json', '传给下一场景的经验')
+                for frame in sorted((learning_path/'frames').glob('*/*.jpg')):
+                    source(frame, f'复盘关键帧 · {frame.parent.name} · {frame.stem}')
             trace = next((p for p in [folder / 'harness-trace.jsonl', folder / 'awomopaw_harness_trace.jsonl',
                          Path(row.get('harness_trace') or official.get('harness_trace') or '/nonexistent')] if p.is_file()), None)
             events = read_events(trace) if trace else []
@@ -542,7 +639,10 @@ class EvidenceStore:
                 result['learning'] = {'version':experience.get('version',0),
                     'source_layouts':[e['source_layout_id'] for e in experience.get('entries',[])],
                     'task_memory':experience.get('task_memory',''),
-                    'failure_analysis':read_json(folder/'learning/analysis.json')}
+                    'failure_analysis':read_json(learning_path/'analysis.json')}
+                if row.get('awomo_open'):
+                    result['learning'].update(kind='task-artifacts',source_layouts=[
+                        f"seed {e['source_seed']} / layout {e['source_layout_id']}" for e in experience.get('entries',[])])
             video_records = read_json(folder / 'videos.json', [])
             if isinstance(video_records, list):
                 head = next((v for v in video_records if isinstance(v, dict) and 'cam_head' in str(v.get('path'))), {})

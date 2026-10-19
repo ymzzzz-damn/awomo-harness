@@ -62,13 +62,27 @@ def empty_memory(experiment):
             'version': 0, 'entries': [], 'task_memory': '', 'pretrained_skills': False}
 
 
+def scene_order(row):
+    """Keep native layout IDs separate from chronological multi-seed order."""
+    return row.get('case_index', row['layout_id'])
+
+
+def source_order(entry):
+    return entry.get('source_case_index', entry['source_layout_id'])
+
+
+def scene_provenance(row):
+    return ({'source_case_index': row['case_index'], 'source_seed': row['seed'],
+             'source_task': row['task']} if 'case_index' in row else {})
+
+
 def validate_memory(memory, experiment, next_layout):
     if memory.get('experiment') != experiment or memory.get('pretrained_skills') is not False:
         raise ValueError('Experience must come exclusively from this experiment')
     entries = memory.get('entries', [])
     if memory.get('version') != len(entries):
         raise ValueError('Experience version/provenance mismatch')
-    ids = [e['source_layout_id'] for e in entries]
+    ids = [source_order(e) for e in entries]
     if ids != sorted(set(ids)) or any(not 0 <= i < next_layout for i in ids):
         raise ValueError('Current/future/duplicate scene in learned experience')
     if len(memory.get('task_memory', '')) > 10000:
@@ -77,7 +91,7 @@ def validate_memory(memory, experiment, next_layout):
     if len(lessons)>8 or len({l['id'] for l in lessons})!=len(lessons):
         raise ValueError('Duplicate/excessive active lesson IDs')
     for lesson in lessons:
-        source=lesson['source_layout_id']
+        source=source_order(lesson)
         if source not in ids or not lesson['id'].startswith(f'E{source:02d}-L') or not isinstance(lesson['text'],str) or not 1<=len(lesson['text'])<=1500:
             raise ValueError('Active lesson has invalid/future provenance')
 
@@ -123,7 +137,17 @@ def working_memory_view(memory):
     if memory.get('schema') == 'awomopaw.task-experience/v2':
         view.update(task=memory['task'], task_artifact=memory.get('task_artifact'),
                     successful_source_layouts=[e['source_layout_id'] for e in memory['entries'] if e['official_success']])
-    rendered = json.dumps(view, ensure_ascii=False, indent=2)
+    if any('source_case_index' in e for e in memory['entries']):
+        view.pop('source_layouts', None)
+        view.pop('successful_source_layouts', None)
+        view['source_case_orders'] = [source_order(e) for e in memory['entries']]
+        view['successful_source_case_orders'] = [source_order(e) for e in memory['entries'] if e['official_success']]
+        view['recent_source_scenes'] = [dict(seed=e['source_seed'], layout=e['source_layout_id'],
+            order=e['source_case_index']) for e in memory['entries'][-8:]]
+        for target, original in zip(view['lesson_ids'], memory.get('active_lessons', [])):
+            target['source_case_index'] = source_order(original)
+    rendered = json.dumps(view, ensure_ascii=False, **(
+        {'separators': (',', ':')} if 'source_case_orders' in view else {'indent': 2}))
     if len(rendered) > 14000:
         raise ValueError('Working memory view exceeds tool output safety margin')
     return rendered
@@ -252,6 +276,8 @@ def failure_evidence(case_dir, *, allow_success=False, output=None):
                 'event_counts': dict(Counter(e.get('event') for e in trace)),
                 'trajectory_samples': [{k: v for k, v in e.items() if k in keys} for e in selected],
                 'workers': policies, 'frames': frames}
+    if receipt.get('model'):
+        evidence['controller_model']=receipt['model']
     save(out/'evidence.json', evidence)
     return evidence
 

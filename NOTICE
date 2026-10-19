@@ -4,4 +4,6 @@ AwomoPaw extensions and modifications are maintained in this repository.
 The external base is QwenPaw, https://github.com/agentscope-ai/QwenPaw,
 revision e6e0dcd85b11212d3bf945a724adc295baa03902, licensed under Apache-2.0.
 The base project's license and attribution are preserved in LICENSE and
-in source patch context. Unmodified upstream sources are not vendored here.
+source/LICENSE. The complete upstream framework, including unmodified source
+and documentation, is vendored under source/ together with AwomoPaw changes.
+The historical modification patch remains under patches/ for provenance.

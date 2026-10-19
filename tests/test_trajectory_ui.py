@@ -25,6 +25,34 @@ def test_outcomes_never_count_unscored_or_infrastructure_as_task_failure():
     assert classify({'success': False}, {'eval_time': 1, 'details': {'0': {'success': True}}}) == 'success'
 
 
+def test_awomo_explicit_stop_preserves_scores_and_only_marks_interrupted_execution(tmp_path):
+    batch = tmp_path/'awomo-open'
+    save(batch/'experiment.json', dict(schema='awomopaw.open-online-harness/v1'))
+    save(batch/'manifest.json', dict(model='gpt-6-astra'))
+    cases = [dict(task='align_blocks', seed=0, layout_id=i, case_index=i) for i in range(3)]
+    save(batch/'official-case-inventory.json', cases)
+    first = batch/'tasks/align_blocks/seed-0/layout-00/self_evolving'
+    second = batch/'tasks/align_blocks/seed-0/layout-01/self_evolving'
+    save(first/'receipt.json', dict(cases[0], arm='self_evolving', run_id='scored',
+        status='completed', valid_episode=True, success=True, score=100))
+    save(second/'receipt.json', dict(cases[1], arm='self_evolving', run_id='interrupted',
+        status='running', valid_episode=False))
+    raw = {p: p.read_bytes() for p in [first/'receipt.json', second/'receipt.json']}
+    store = EvidenceStore(tmp_path)
+    assert {s['layout']:s['status'] for s in store.scan()['scenes']} == {0:'success', 1:'running', 2:'pending'}
+    save(batch/'user-requested-stop-for-rsi-hybrid.json', dict(stopped=True))
+    save(batch/'ui-sync.json', dict(backend_alive=False))
+    scenes = store.scan(force=True)['scenes']
+    assert {s['layout']:s['status'] for s in scenes} == {0:'success', 1:'unscored', 2:'pending'}
+    stopped = next(s for s in scenes if s['layout'] == 1)
+    assert '未评分' in stopped['qualification']
+    assert any(f['label'] == '用户停止回执' for f in store.detail(stopped['id'])['files'])
+    assert all(p.read_bytes() == original for p, original in raw.items())
+    # A later active backend supersedes the historical stop marker.
+    save(batch/'ui-sync.json', dict(backend_alive=True))
+    assert {s['layout']:s['status'] for s in store.scan(force=True)['scenes']}[1] == 'running'
+
+
 def test_inventory_keeps_pending_and_scene_logs_have_real_actions(tmp_path):
     batch = tmp_path / 'batch'
     episode = batch / 'episode-00-seed-0-layout-0'

@@ -103,6 +103,24 @@ def test_unscored_wrong_task_and_final_outcomes_never_call_model(tmp_path,case_f
         asyncio.run(learn(case,snap,None,tmp_path/'failed-transport',model_analysis=forbidden))
 
 
+def test_learning_crosses_seed_boundary_without_relabeling_native_layout(tmp_path,case_factory):
+    memory=empty_task_memory('open','align_blocks')
+    async def model(evidence,before,config,output):
+        return analysis(False)
+    for order,seed,layout in [(54,0,54),(55,1,0)]:
+        case=case_factory(layout,False)
+        row=json.loads((case/'receipt.json').read_text())
+        row.update(task='align_blocks',seed=seed,case_index=order)
+        save(case/'receipt.json',row)
+        snap=tmp_path/f'open-snapshot-{order}.json';save(snap,memory)
+        memory=asyncio.run(learn(case,snap,None,tmp_path/f'open-learning-{order}',model_analysis=model))
+    validate_task_memory(memory,'open',56,'align_blocks')
+    assert [e['source_layout_id'] for e in memory['entries']]==[54,0]
+    assert [e['source_case_index'] for e in memory['entries']]==[54,55]
+    assert [e['source_seed'] for e in memory['entries']]==[0,1]
+    assert memory['active_lessons'][-1]['id']=='E55-L01'
+
+
 def test_failure_analysis_cannot_publish_success_mechanisms_or_skill():
     value=analysis(False);validate_rethinking(value,{'cam_head:0'},False)
     value['skill_text']='# Invented success'

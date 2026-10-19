@@ -1,15 +1,27 @@
-"""Launch and audit one GPT-authored RoboDojo development episode."""
+#!/usr/bin/env python3
+"""Shared GPT harness episode execution and summary utilities."""
+from __future__ import annotations
+import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import fcntl
 import hashlib
 import json
 import os
-import re
 from pathlib import Path
+import re
 import shutil
+import signal
 import subprocess
+import sys
+import threading
 import time
+
 import harness_utils as base
-NODE = '192.168.48.153'
+from harness_models import checked_model, model_matches
+
 ARMS = ['without_skills', 'with_skills']
+NODE = '192.168.48.153'
+
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -32,21 +44,54 @@ def inventory(sim):
             for i in range(55)]
 
 
+
+
+def aggregate(cases, rows, status):
+    result = {'schema': 'awomopaw.gpt6-harness-skills-ablation/v1', 'status': status, 'updated_at': base.now(),
+        'task': 'align_blocks', 'seed': 0, 'requested_layouts': len(cases),
+        'requested_episodes': 2*len(cases), 'finished': len(rows), 'arms': {},
+        'execution': 'gpt6_direct_harness', 'frozen_controller_executed': False}
+    for arm in ARMS:
+        selected = [r for r in rows if r['arm'] == arm]
+        valid = [r for r in selected if r.get('valid_episode')]
+        successes = sum(bool(r['success']) for r in valid)
+        result['arms'][arm] = {'requested': len(cases), 'finished': len(selected),
+            'valid_episodes': len(valid), 'successes': successes,
+            'success_rate_over_valid_episodes': successes/len(valid) if valid else None,
+            'mean_official_score': sum(r['score'] for r in valid)/len(valid) if valid else None,
+            'unscored_or_invalid': len(selected)-len(valid),
+            'complete_scene_coverage': len(valid) == len(cases)}
+    pairs = []
+    for c in cases:
+        pair = {r['arm']: r for r in rows if r['layout_id'] == c['layout_id'] and r.get('valid_episode')}
+        if set(pair) == set(ARMS):
+            pairs.append({'layout_id': c['layout_id'],
+                'without_skills': pair['without_skills']['score'], 'with_skills': pair['with_skills']['score'],
+                'delta': pair['with_skills']['score']-pair['without_skills']['score']})
+    result['complete_pairs'] = len(pairs)
+    result['paired_mean_score_delta'] = sum(p['delta'] for p in pairs)/len(pairs) if pairs else None
+    result['pairs'] = pairs
+    return result
+
+
 def run_case(case, arm, gpu, args):
-    dest = args.output / f'layout-{case["layout_id"]:02d}' / arm
+    expected_model=checked_model(json.loads((args.output/'agent-config.json').read_text())['active_model']['model'])
+    parent = args.output / f'seed-{case["seed"]}' if 'case_index' in case else args.output
+    dest = parent / f'layout-{case["layout_id"]:02d}' / arm
     dest.mkdir(parents=True, exist_ok=False)
     port = args.port_base + case['layout_id']*6 + (ARMS.index(arm)*3 if arm in ARMS else 0)
     if not all(base.port_available(port+i) for i in range(3)):
         raise RuntimeError('Isolated port conflict')
     row = dict(case, arm=arm, gpu=gpu, status='starting', valid_episode=False,
-        started_at=base.now(), output=str(dest), actions=0, provider='gpt6-harness', model='gpt-6-astra', vla_used=False)
+        started_at=base.now(), output=str(dest), actions=0, provider='gpt6-harness', model=expected_model, vla_used=False)
     base.save(dest / 'receipt.json', row)
-    fixture = dict(case, task='align_blocks', seed=0, arm=arm, output=str(dest),
-        test_id=str(args.output), scene_index=case['layout_id']+1)
+    fixture = dict(case, task=case.get('task', 'align_blocks'), seed=case.get('seed', 0), arm=arm, output=str(dest),
+        test_id=str(args.output), scene_index=case.get('case_index', case['layout_id'])+1)
     if arm == 'self_evolving':
         snapshot = args.experience_snapshot
         knowledge = json.loads(snapshot.read_text())
-        if any(e['source_layout_id'] >= case['layout_id'] for e in knowledge['entries']):
+        from gpt6_failure_learning import source_order, scene_order
+        if any(source_order(e) >= scene_order(case) for e in knowledge['entries']):
             raise RuntimeError('Experience contains current/future scene evidence')
         row.update(experience_version=knowledge['version'], experience_sha256=digest(snapshot),
                    experience_source_layouts=[e['source_layout_id'] for e in knowledge['entries']])
@@ -105,6 +150,9 @@ def run_case(case, arm, gpu, args):
                 '--output', str(dest), '--agent-config', str(args.output/'agent-config.json'),
                 '--bridge', endpoint, '--arm', arm, '--skill', str(args.output/'skill'),
                 '--timeout', str(args.case_timeout)]
+            command += ['--model',expected_model]
+            if 'task' in case:
+                command += ['--task', case['task'], '--seed', str(case['seed'])]
             if arm == 'self_evolving':
                 command += ['--experience', str(args.experience_snapshot)]
             agent = subprocess.Popen(command, env=env, stdout=log, stderr=subprocess.STDOUT,
@@ -198,12 +246,12 @@ def run_case(case, arm, gpu, args):
                 path=dest/'subtask-reflections.jsonl'
                 row['subtask_reflection_count']=len(path.read_text().splitlines()) if path.exists() else 0
         audit = [json.loads(line) for line in (dest/'model-audit.jsonl').read_text().splitlines()]
-        if not audit or any(r['requested_model'] != 'gpt-6-astra' or not str(r['returned_model']).startswith('gpt-6-astra') for r in audit):
+        if not audit or any(r['requested_model'] != expected_model or not model_matches(expected_model,r['returned_model']) for r in audit):
             raise RuntimeError('Missing or mismatched GPT6 model response evidence')
         trace = [json.loads(line) for line in (dest/'harness-trace.jsonl').read_text().splitlines()]
         if any(r.get('source') == 'policy' for r in trace):
             raise RuntimeError('Unexpected pretrained policy actions in GPT6-only arm')
-        save_audit = {'verified':True,'responses':len(audit),'model':'gpt-6-astra','vla_used':False}
+        save_audit = {'verified':True,'responses':len(audit),'model':expected_model,'vla_used':False}
         base.save(dest/'model-audit-summary.json',save_audit)
         row.update(status='completed', valid_episode=True, score=native['score'],
             success=bool(official.get('task_succeeded')), videos=videos, skill_read_count=len(reads),
@@ -239,4 +287,7 @@ def run_case(case, arm, gpu, args):
         row.update(finished_at=base.now(), owned_services_cleaned=True)
         base.save(dest/'receipt.json', row)
     return row
+
+
+
 

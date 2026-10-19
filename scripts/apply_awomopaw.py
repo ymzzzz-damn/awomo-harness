@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply our patch and added files to the pinned external base checkout."""
+"""Apply the compatibility patch and complete source snapshot to a clean pinned base checkout."""
 import argparse
 from pathlib import Path
 import shutil
@@ -19,15 +19,11 @@ def main():
         raise SystemExit('Expected external base commit ' + BASE)
     if git('status', '--porcelain'):
         raise SystemExit('Use a clean external checkout; preserve existing changes first')
-    additions = [p for p in (root/'source').rglob('*') if p.is_file()]
-    for path in additions:
-        target = checkout/path.relative_to(root/'source')
-        if target.exists():
-            raise SystemExit('Added file would overwrite an existing path: ' + str(target))
+    source_files = [p for p in (root/'source').rglob('*') if p.is_file()]
     patch = str(root/'patches/awomopaw.patch')
     subprocess.run(['git', '-C', str(checkout), 'apply', '--check', patch], check=True)
     subprocess.run(['git', '-C', str(checkout), 'apply', patch], check=True)
-    for path in additions:
+    for path in source_files:
         target = checkout/path.relative_to(root/'source')
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(path, target)

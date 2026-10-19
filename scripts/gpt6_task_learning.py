@@ -2,7 +2,7 @@
 """Success skills and success/failure video feedback for the next same-task policy.
 
 This workflow uses the connected AwomoPaw model provider directly. It does not
-bundle an external controller, replay an episode, or consume native action steps.
+depend on an external evolution framework, replay an episode, or consume native action steps.
 """
 import argparse
 import asyncio
@@ -12,10 +12,12 @@ import hashlib
 import json
 from pathlib import Path
 import re
+from harness_models import checked_model, model_matches
 
 from gpt6_failure_learning import (MODEL, SCHEMA as FAILURE_SCHEMA, digest, save,
     empty_memory, validate_memory, validate_analysis, working_memory_view,
-    learning_eligibility, failure_evidence, normalize_visual_observations)
+    learning_eligibility, failure_evidence, normalize_visual_observations,
+    scene_order, source_order, scene_provenance)
 
 SCHEMA = deepcopy(FAILURE_SCHEMA)
 SCHEMA['properties']['outcome_summary'] = SCHEMA['properties'].pop('failure_summary')
@@ -97,6 +99,8 @@ def validate_task_memory(memory, experiment, next_layout, task=None):
     validate_memory(memory, experiment, next_layout)
     if memory.get('schema') != 'awomopaw.task-experience/v2' or (task and memory.get('task') != task):
         raise ValueError('Same-task experience schema mismatch')
+    if any(e.get('source_task', memory['task']) != memory['task'] for e in memory['entries']):
+        raise ValueError('Experience contains evidence from another task')
     if memory.get('task_artifact'):
         load_task_artifact(memory['task_artifact'], memory['task'])
 
@@ -144,9 +148,11 @@ def distill_after(before, row, analysis, evidence, output):
     parent = load_task_artifact(before['task_artifact'], before['task']) if before.get('task_artifact') else None
     entry = dict(source_layout_id=row['layout_id'], source_run_id=row['run_id'],
         official_success=row['success'], analysis_sha256=digest(output/'analysis.json'),
-        trace_sha256=evidence['trace_sha256'], evidence_sha256=digest(output/'evidence.json'))
-    lessons = before.get('active_lessons', []) + [dict(id=f"E{row['layout_id']:02d}-L{i+1:02d}",
-        source_layout_id=row['layout_id'], outcome='success' if row['success'] else 'failure', text=text)
+        trace_sha256=evidence['trace_sha256'], evidence_sha256=digest(output/'evidence.json'),
+        **scene_provenance(row))
+    lessons = before.get('active_lessons', []) + [dict(id=f"E{scene_order(row):02d}-L{i+1:02d}",
+        source_layout_id=row['layout_id'], outcome='success' if row['success'] else 'failure', text=text,
+        **scene_provenance(row))
         for i, text in enumerate(analysis['lessons'])]
     after = dict(before, version=before['version']+1, entries=before['entries']+[entry],
         task_memory=analysis['updated_task_memory'], active_lessons=lessons[-8:])
@@ -181,7 +187,7 @@ def distill_after(before, row, analysis, evidence, output):
         save(directory/'task-artifact.json', manifest)
         after['task_artifact'] = dict(path=str((directory/'task-artifact.json').resolve()),
             sha256=digest(directory/'task-artifact.json'), revision=revision)
-    validate_task_memory(after, before['experiment'], row['layout_id']+1, before['task'])
+    validate_task_memory(after, before['experiment'], scene_order(row)+1, before['task'])
     working_memory_view(after)
     save(output/'experience-after.json', after)
     return after
@@ -190,8 +196,9 @@ def distill_after(before, row, analysis, evidence, output):
 async def analyze(evidence, before, config_file, output):
     from qwenpaw.providers import ProviderManager
     slot = json.loads(Path(config_file).read_text())['active_model']
-    if slot['model'] != MODEL:
-        raise ValueError('Rethinking must use the same configured GPT6 model')
+    model=checked_model(slot['model'])
+    if evidence.get('controller_model',model)!=model:
+        raise ValueError('Rethinking must use the same model as the completed controller')
     provider = ProviderManager.get_instance().get_provider(slot['provider_id'])
     if provider is None:
         raise RuntimeError('Pinned model provider unavailable')
@@ -206,20 +213,20 @@ async def analyze(evidence, before, config_file, output):
             dict(type='input_image', detail='high', image_url='data:image/jpeg;base64,' +
                  base64.b64encode(Path(f['path']).read_bytes()).decode())]
     save(output/'reflection-input.json', dict(instructions=INSTRUCTIONS, **payload,
-        frame_manifest=evidence['frames'], model=MODEL, frame_count=len(evidence['frames'])))
+        frame_manifest=evidence['frames'], model=model, frame_count=len(evidence['frames'])))
     client = provider._client(timeout=180).with_options(max_retries=0)
     errors = []
     try:
         for attempt in range(3):
-            response = await client.responses.create(model=MODEL,
+            response = await client.responses.create(model=model,
                 instructions=INSTRUCTIONS + ('\nCorrect validation error: ' + errors[-1] if errors else ''),
                 input=[dict(role='user', content=content)],
                 text={'format': {'type': 'json_schema', 'name': 'task_video_rethinking', 'strict': True, 'schema': SCHEMA}})
             save(output/f'response-{attempt}.json', response.model_dump(mode='json'))
             with (output/'model-audit.jsonl').open('a') as stream:
-                stream.write(json.dumps(dict(requested_model=MODEL, returned_model=response.model,
+                stream.write(json.dumps(dict(requested_model=model, returned_model=response.model,
                     response_id=response.id, frame_count=len(evidence['frames']), attempt=attempt))+'\n')
-            if not (response.model == MODEL or str(response.model).startswith(MODEL+'-')):
+            if not model_matches(model,response.model):
                 raise RuntimeError('Rethinking model mismatch')
             try:
                 value, omitted = normalize_visual_observations(json.loads(response.output_text))
@@ -239,7 +246,11 @@ async def learn(case_dir, snapshot, config_file, output, split='development', mo
     case_dir, snapshot, output = Path(case_dir), Path(snapshot), Path(output)
     before = json.loads(snapshot.read_text())
     row = verified_outcome(case_dir, before['task'])
-    validate_task_memory(before, before['experiment'], row['layout_id'], before['task'])
+    model=checked_model(row.get('model',MODEL))
+    if config_file and Path(config_file).is_file():
+        if json.loads(Path(config_file).read_text())['active_model']['model']!=model:
+            raise ValueError('Task learning profile does not match the completed controller model')
+    validate_task_memory(before, before['experiment'], scene_order(row), before['task'])
     qualification = learning_eligibility(case_dir, allow_success=True)
     if not qualification['eligible']:
         raise ValueError('Task learning refused: ' + qualification['reason'])
@@ -258,7 +269,8 @@ async def learn(case_dir, snapshot, config_file, output, split='development', mo
         source_run_id=row['run_id'], outcome='success' if row['success'] else 'failure',
         input_version=before['version'], output_version=after['version'], before_sha256=digest(snapshot),
         after_sha256=digest(output/'experience-after.json'), frame_count=len(evidence['frames']),
-        model=MODEL, task_artifact=after.get('task_artifact'), no_episode_replay=True))
+        model=model, task_artifact=after.get('task_artifact'), no_episode_replay=True,
+        **scene_provenance(row)))
     return after
 
 
