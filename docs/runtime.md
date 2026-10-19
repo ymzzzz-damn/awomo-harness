@@ -97,6 +97,17 @@ python scripts/configure_robodojo.py \
 
 先配置支持图片与 Responses API 的 GPT provider，例如 `awomopaw models config-key openai`（也可执行 `awomopaw models config` 交互配置）。凭据由本机 AwomoPaw 管理。若使用自定义配置目录，执行以下命令前设置 `AWOMOPAW_WORKING_DIR` 和 `AWOMOPAW_SECRET_DIR`，与配置 provider 时一致。
 
+使用自定义兼容接口时，可按下面的方式注册；已有同名 provider 时复用现有配置即可。`config-key` 交互输入的密钥保存在本机，不写入运行产物或 Git。
+
+```bash
+awomopaw models add-provider gpt6 --name 'GPT Gateway' \
+  --base-url https://ai.zhimiaonengzhi.com/v1
+awomopaw models config-key gpt6
+awomopaw models add-model gpt6 --model-id gpt-6-astra --model-name gpt-6-astra
+```
+
+随后把下面运行命令的 `--provider openai` 改为 `--provider gpt6`。图片预检使用 384×384 PNG，只检查最终文字回答；16×16 缩略图在该兼容接口上曾出现错误识色，不能用于判定模型的仿真视觉能力。
+
 ```bash
 # 检查场景、Python 依赖、实际 agent 工具，以及一次图片 API 调用。
 # 不启动 Isaac，不消耗官方任务动作。
@@ -126,6 +137,8 @@ python scripts/run_learning_loop.py \
 3. 等待官方评分和三路完整 MP4；校验 task、run ID、layout、结果与视频哈希。
 4. **成功与失败均复盘**：默认从每路视频抽取最多 5 帧，保留真实时间戳，并结合公开动作历史、执行记录生成分析、修正建议与任务记忆。
 5. **成功时蒸馏** `SKILL.md`、`memory.json`、`task-artifact.json`。失败更新经验；若已有成功技能，则保留技能并更新失败反馈。下一场同任务必须读取完整经验及这三个产物，随后根据当前场景生成策略。
+
+动作提交前会检查整个块的必填字段、维度、有限数值及夹爪范围。双臂机器人每个动作必须包含两臂与两夹爪的目标，未运动的手臂也须明确保持当前值。缺字段的块会在任何动作执行前被拒绝。若原生执行发生异常，返回标明部分执行不确定性的失败回执，释放剩余动作；模型须重新观察、反思后规划，不会自动重放失败动作。已释放或过期的块也不会令子任务监督永久卡住。
 
 这些是上下文技能和记忆，不是模型权重训练。顺序为 seed 列表内的 layout 列表；可用 `--seeds 0 1 --layouts 0 1` 跨 seed 复用，同一个输出目录只对应一个 task。
 

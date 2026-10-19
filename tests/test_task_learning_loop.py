@@ -198,6 +198,34 @@ def test_subtask_gate_reviews_once_after_many_actions_and_rejects_stale_frames()
     with pytest.raises(ValueError,match='uncertainty'):gate.require(obs(40))
 
 
+@pytest.mark.parametrize('released', [True, False])
+def test_bridge_execution_error_reconciles_only_released_native_chunks(monkeypatch, released):
+    from qwenpaw.app.embodiments.robodojo_adapter import AdapterConfigurationError
+    manager = object.__new__(GPT6AblationManager)
+    manager.subtask_gate = SubtaskSupervisor()
+    manager.segment_actions = 40
+    gate = manager.subtask_gate
+    gate.start('chunk-one', obs())
+    current = dict(obs(1), pending_chunk_id=None if released else 'chunk-one')
+    manager.current_observation = lambda: current
+    def failed(*args, **kwargs):
+        raise AdapterConfigurationError('native chunk expired or transport interrupted')
+    monkeypatch.setattr(RoboDojoRunManager, 'execute_action_chunk', failed)
+    with pytest.raises(AdapterConfigurationError):
+        manager.execute_action_chunk('chunk-one', 1, True)
+    if released:
+        assert gate.active is None and gate.last['receipt']['chunk_released']
+        with pytest.raises(ValueError, match='Reflect'):
+            gate.require(current)
+        for camera in CAMERAS:
+            gate.frame(current, camera, b'current')
+        gate.review(dict(chunk_id='chunk-one', observation_id=current['observation_id'],
+                         verdict='correct', reflection='The released chunk failed; replan from current RGB.'), current)
+        gate.require(current)
+    else:
+        assert gate.active == 'chunk-one' and gate.last is None
+
+
 
 
 def test_learned_skill_requires_complete_hash_verified_reads(tmp_path,case_factory):

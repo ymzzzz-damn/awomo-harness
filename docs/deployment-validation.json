@@ -1,12 +1,12 @@
 {
   "date": "2026-10-19",
   "scope": "Portable GPT direct-control learning loop deployment; no live GPT task-success claim",
-  "source_parent": "cfee1f143920603fe723d121a7a25c18bee4ad8d",
+  "source_parent": "baae7e876fc51d7837fe82116550cad8f796bfc7",
   "regression": {
-    "passed": 135,
+    "passed": 141,
     "deselected": 2,
     "reason": "independent JetRover hardware-package cases",
-    "environment": "Fresh full dependency installation; 135 passed, 2 independent hardware cases deselected"
+    "environment": "Fresh full dependency installation; includes missing bimanual fields, partial native failures and released-chunk supervision recovery"
   },
   "packaging": {
     "agent_wheel_built": true,
@@ -86,9 +86,8 @@
       "memory.json",
       "task-artifact.json"
     ],
-    "live_gpt_api_called": false,
-    "success_branch_test_source": "Controlled official-outcome fixtures and model responses, not a native manipulation success",
-    "live_api_limitation": "No usable GPT provider credentials were present in the inspected local AwomoPaw configuration."
+    "live_gpt_api_called": true,
+    "success_branch_test_source": "Controlled official-outcome fixtures and model responses, not a native manipulation success"
   },
   "clean_install": {
     "python": "3.10.12",
@@ -97,8 +96,8 @@
     "pip_check": "No broken requirements found.",
     "cli_help_passed": true,
     "isolated_agent_dry_run_passed": true,
-    "live_model_probe": false,
-    "credentials_for_dry_run": "Isolated dummy credential; no API request",
+    "live_model_probe": true,
+    "credentials_for_dry_run": "Local encrypted GPT provider configuration; no credentials in repository",
     "constraints": "requirements/linux-py310-tested.txt",
     "versions": {
       "agentscope": "1.0.19.post1",
@@ -118,5 +117,39 @@
     "Existing ACP agent API requires agent-client-protocol 0.9",
     "Transport interpreter dependency preflight includes h5py",
     "Keep Isaac client overlay out of the separate framework transport interpreter"
-  ]
+  ],
+  "live_api_validation": {
+    "base_url": "https://ai.zhimiaonengzhi.com/v1",
+    "provider_id": "gpt6",
+    "model": "gpt-6-astra",
+    "image_probe": {
+      "passed": true,
+      "size": [
+        384,
+        384
+      ],
+      "expected_color": "blue",
+      "returned_text": "Blue"
+    },
+    "native_video_rethinking": {
+      "completed": true,
+      "cameras": 3,
+      "timestamped_frames": 15,
+      "input_memory_version": 0,
+      "output_memory_version": 1,
+      "source": "Earlier scripted native hold episode; validates real API video analysis, not live GPT control"
+    },
+    "two_scene_live_direct_control_loop": "running",
+    "first_live_attempt": {
+      "status": "stopped_on_infrastructure_error",
+      "reason": "Native bimanual validator accepted missing right-arm fields, followed by a stuck subtask gate",
+      "actions_before_stop": 4,
+      "learned_from_invalid_attempt": false,
+      "fixes": [
+        "Check every required action field before any motion",
+        "Release failed native chunks with explicit partial-execution receipts",
+        "Reconcile expired/released chunks with the subtask supervisor"
+      ]
+    }
+  }
 }

@@ -187,7 +187,16 @@ class GPT6AblationManager(FixtureManager):
     def execute_action_chunk(self, chunk_id, max_actions=None, discard_remaining=False):
         if discard_remaining is not True or type(max_actions) is not int or not 1 <= max_actions <= (getattr(self, 'segment_actions', None) or 40):
             raise ValueError('Execute 1..segment_actions and discard the unexecuted tail')
-        result=super().execute_action_chunk(chunk_id,max_actions,discard_remaining)
+        try:
+            result=super().execute_action_chunk(chunk_id,max_actions,discard_remaining)
+        except AdapterConfigurationError as error:
+            gate=getattr(self,'subtask_gate',None)
+            if gate and gate.active==chunk_id:
+                obs=self.current_observation()
+                if obs.get('pending_chunk_id')!=chunk_id and not obs.get('episode_end'):
+                    gate.completed(chunk_id,dict(outcome='execution_failed',error=str(error),
+                        partial_execution_unknown=True,chunk_released=True),obs)
+            raise
         if getattr(self,'subtask_gate',None) and not result.get('episode_end'):
             self.subtask_gate.completed(chunk_id,result,self.current_observation())
         return result

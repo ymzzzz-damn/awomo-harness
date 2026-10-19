@@ -355,9 +355,13 @@ class InteractiveEpisodeHarness:
         if len(actions) > max_actions:
             raise ValueError(f"action chunk exceeds the {max_actions}-action limit")
         validated: list[dict[str, Any]] = []
+        required = _action_spec(self.task_env, self._observation or {})["required_fields"]
         for action in actions:
             if not isinstance(action, dict) or not action:
                 raise ValueError("every action must be a non-empty object")
+            missing, extra = set(required) - set(action), set(action) - set(required)
+            if missing or extra:
+                raise ValueError(f"action fields mismatch: missing={sorted(missing)}, unexpected={sorted(extra)}")
             self.task_env.validate_action_dict(action)
             if hasattr(self.task_env, "get_action_type"):
                 action_type = self.task_env.get_action_type(action)
@@ -370,6 +374,11 @@ class InteractiveEpisodeHarness:
                     raise ValueError(f"action field {key!r} is not numeric") from exc
                 if not np.isfinite(numeric).all():
                     raise ValueError(f"action field {key!r} contains NaN or infinity")
+                if numeric.shape != (required[key]["dimension"],):
+                    raise ValueError(f"action field {key!r} has the wrong dimension")
+                bounds = required[key].get("normalized_range")
+                if bounds and ((numeric < bounds[0]).any() or (numeric > bounds[1]).any()):
+                    raise ValueError(f"action field {key!r} is outside its normalized range")
             validated.append(action)
         return validated
 
@@ -424,58 +433,8 @@ class InteractiveEpisodeHarness:
             "note": "The validated action chunk remains inside the embodiment until execute_action_chunk is called.",
         }
 
-    def _handle_infer(self, payload: dict[str, Any]) -> dict[str, Any]:
-        with self._lock:
-            observation = deepcopy(self._observation)
-        expected_id = self._require_current_observation(payload.get("observation_id"))
-        if observation is None:
-            raise ValueError("current observation is unavailable")
-        self._require_official_instruction(observation)
-        if self.task_env.end_flag[0]:
-            raise ValueError("episode has already ended")
-        provider_id = " ".join(str(payload.get("provider_id") or "").split())
-        if provider_id != self._provider_id:
-            raise ValueError(
-                f"provider {provider_id!r} is not loaded for this session; "
-                f"active provider is {self._provider_id!r}"
-            )
-        subtask_goal = " ".join(str(payload.get("subtask_goal") or "").split())
-        task_prompt = " ".join(
-            str(payload.get("optimized_task_prompt") or "").split()
-        )
-        planning_summary = " ".join(
-            str(payload.get("planning_summary") or "").split()
-        )
-        if not 1 <= len(subtask_goal) <= 1000:
-            raise ValueError("subtask_goal must contain 1 to 1000 characters")
-        if not 1 <= len(task_prompt) <= 3000:
-            raise ValueError(
-                "optimized_task_prompt must contain 1 to 3000 characters"
-            )
-        if len(planning_summary) > 2000:
-            raise ValueError("planning_summary exceeds 2000 characters")
-
-        # The VLA contract is prompt + current image/observation. Do not wrap the
-        # optimized prompt in adapter-specific instructions or convert it to joints.
-        observation["instruction"] = task_prompt
-        try:
-            self.model_client.call(func_name="update_obs", obs=observation)
-            actions = self.model_client.call(func_name="get_action")
-            complete_actions = self._validate_action_chunk(
-                actions, max_actions=_MAX_POLICY_ACTIONS
-            )
-        except Exception as exc:
-            self._record_failure(provider_id, "provider_inference_failed", str(exc))
-            raise
-        return self._store_chunk(
-            actions=complete_actions,
-            source="policy",
-            provider_id=provider_id,
-            subtask_goal=subtask_goal,
-            task_prompt=task_prompt,
-            planning_summary=planning_summary,
-            observation_id=expected_id,
-        )
+    def _handle_infer(self, payload):
+        raise ValueError('VLA inference disabled; GPT6 controls this episode')
 
     def _handle_direct_action(self, payload: dict[str, Any]) -> dict[str, Any]:
         expected_id = self._require_current_observation(payload.get("observation_id"))
@@ -538,6 +497,8 @@ class InteractiveEpisodeHarness:
                 self._pending_source = None
                 self._pending_provider_id = None
                 self._pending_created_at = None
+                self._pending_actions = []
+                self._action_cursor = 0
             raise ValueError("action chunk exceeded the bounded freshness window")
 
         executed = 0
@@ -559,7 +520,7 @@ class InteractiveEpisodeHarness:
                     self.model_client.call(
                         func_name="update_obs", obs=intermediate_observation
                     )
-        except Exception:
+        except Exception as error:
             observation = (
                 self.task_env.get_obs_batch(env_idx_list=[0], last_frame=True)[0]
                 if self.task_env.is_episode_end()
@@ -571,7 +532,23 @@ class InteractiveEpisodeHarness:
                 self._pending_source = None
                 self._pending_provider_id = None
                 self._pending_created_at = None
-            raise
+                self._pending_actions = []
+                self._action_cursor = 0
+                self._last_error = f"{type(error).__name__}: {error}"
+            receipt = {
+                "outcome": "execution_failed", "error": f"{type(error).__name__}: {error}",
+                "executed": executed, "partial_execution_unknown": True,
+                "chunk_complete": False, "chunk_released": True,
+                "discarded_actions": len(actions) - cursor,
+                "pending_actions_remaining": 0,
+                "action_count": int(self.task_env.take_action_cnt[0]),
+                "observation_id": self._observation_id,
+                "episode_end": bool(self.task_env.end_flag[0]),
+                "task_success": None, "source": source, "provider_id": provider_id,
+                "instruction": "Execution failed; do not replay this chunk. Inspect all current cameras and state before replanning.",
+            }
+            self._trace("action_chunk_execution", chunk_id=chunk_id, **receipt)
+            return receipt
 
         if self.task_env.is_episode_end():
             observation = self.task_env.get_obs_batch(env_idx_list=[0], last_frame=True)[0]
@@ -778,6 +755,14 @@ class InteractiveEpisodeHarness:
             daemon=True,
         )
         self._server_thread.start()
+        deadline = time.monotonic() + 10.0
+        while not self._server.started:
+            if not self._server_thread.is_alive():
+                raise RuntimeError(f'Control server failed to bind/start on {self.host}:{self.port}')
+            if time.monotonic() >= deadline:
+                self._server.should_exit = True
+                raise RuntimeError(f'Control server readiness timeout on {self.host}:{self.port}')
+            time.sleep(0.05)
 
     def stop_server(self) -> None:
         if self._server is not None:

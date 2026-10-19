@@ -24,6 +24,9 @@ id gpt6-harness. Poll session_status while initializing; Isaac startup may take
 several minutes. Before readiness do not request camera frames. Once ready,
 read current_observation and capture all three cameras. Author absolute joint
 and gripper targets using ONLY the observation's action_spec and robot_state.
+Every action must include every entry in action_spec.required_fields, including
+both arms and both grippers on a bimanual robot. Hold an inactive arm using its
+current joint state; omitting that arm is not a hold command.
 Submit 1..40 explicit action dictionaries with submit_direct_action_chunk, then
 execute_action_chunk with max_actions in 1..40 and discard_remaining=true.
 Use smaller chunks when contact or geometry is uncertain. There are no code
@@ -252,17 +255,21 @@ async def run(args):
                 raise ValueError('Model connectivity probes require --dry-run')
             import base64,io
             from PIL import Image
-            buf=io.BytesIO();Image.new('RGB',(16,16),'blue').save(buf,format='PNG')
+            # Tiny thumbnails can be rescaled into nearly uniform patches by
+            # compatible gateways. Probe at a useful vision resolution.
+            buf=io.BytesIO();Image.new('RGB',(384,384),'blue').save(buf,format='PNG')
             pixels='data:image/png;base64,'+base64.b64encode(buf.getvalue()).decode()
             msg=Msg('user',[
-                {'type':'text','text':'Connectivity probe only. Name the dominant color in this image in English.'},
+                {'type':'text','text':'Connectivity probe only. Name the dominant color in this image in English. Reply with only the color name.'},
                 {'type':'image','source':{'type':'url','url':pixels}}],'user')
             formatted=await agent.formatter.format([msg])
             response=await asyncio.wait_for(agent.model(formatted),120)
             reply=response.content
+            answer=' '.join(b.get('text','') for b in reply if b.get('type')=='text')
             save(dest/'framework-model-probe.json',dict(actual_model=agent.model.model_name,content=reply,
+                image_size=[384,384],image_sha256=hashlib.sha256(buf.getvalue()).hexdigest(),
                 no_episode_started=True))
-            if 'blue' not in json.dumps(reply).lower():
+            if 'blue' not in answer.lower():
                 raise RuntimeError('Selected framework model did not receive the probe image')
             save(dest/'agent-finished.json',dict(status='model_probe_passed',no_episode_started=True))
             return

@@ -35,8 +35,8 @@
     },
     {
       "path": "docs/deployment-validation.json",
-      "sha256": "acac0306115c5a1ef14d8490fc71d85ca76f374e0f72ebbb106539e0757e5bec",
-      "bytes": 4427
+      "sha256": "ed91eb9d907d378d85858f893406be83baa32ff9b2313366452e64d9b8cc1a50",
+      "bytes": 5543
     },
     {
       "path": "docs/ownership.json",
@@ -45,13 +45,13 @@
     },
     {
       "path": "docs/runtime.md",
-      "sha256": "b7b51ba1ff2a12c6f5fe026d837299403a164448215ed0c1b7e61556d7797306",
-      "bytes": 10106
+      "sha256": "dc8cdde8cb3339e63ff5fcccff0922e1b5c076f12e62233772e8bb95645d7171",
+      "bytes": 11295
     },
     {
       "path": "docs/source-completeness.md",
-      "sha256": "9f9f8005e6793628ebc881dff79ebc549bc62bbc24d756e41aec6ab234758d0f",
-      "bytes": 2522
+      "sha256": "8e596ead2121b1edab27c1ba99264475c0f007c4bdfc3ccfcdc4273bb1d80417",
+      "bytes": 2663
     },
     {
       "path": "embodiments/robodojo_sim/EMBODIMENT.md",
@@ -110,8 +110,8 @@
     },
     {
       "path": "robodojo-overlay/src/eval_client/interactive_harness.py",
-      "sha256": "df65615eb89916a8508c8b2edf81368da49329a6ab0b4b1738695881c029053e",
-      "bytes": 35842
+      "sha256": "385e178980d9b5c390e5e1d2a6526cfb9c51586801a28f999686195cb9e766c8",
+      "bytes": 35813
     },
     {
       "path": "runtime/gpt6-harness-ablation-adapter/deploy.py",
@@ -130,8 +130,8 @@
     },
     {
       "path": "runtime/gpt6-harness-ablation-adapter/interactive_harness.py",
-      "sha256": "5de9fa1ea9cc5e2ddb0623e28b0a01ecb697ddb00bdaa8b6af13bf707c2b0c72",
-      "bytes": 33966
+      "sha256": "385e178980d9b5c390e5e1d2a6526cfb9c51586801a28f999686195cb9e766c8",
+      "bytes": 35813
     },
     {
       "path": "runtime/gpt6-harness-ablation-adapter/model.py",
@@ -180,8 +180,8 @@
     },
     {
       "path": "scripts/gpt6_ablation_bridge.py",
-      "sha256": "50509217f6b18dd26a480850d4edec0d8f8f314e8861d8fd988446f1f738da74",
-      "bytes": 12189
+      "sha256": "10c61f6726c7b5da2a1d4278a640b4882b62f4571a49310406b8df9fcb2bd088",
+      "bytes": 12684
     },
     {
       "path": "scripts/gpt6_episode.py",
@@ -230,8 +230,8 @@
     },
     {
       "path": "scripts/run_gpt6_harness_agent.py",
-      "sha256": "2064ed606b2e96b2e4e9d50abce8fdf6180375bcf1f00a8f3f6c48babcd54ee3",
-      "bytes": 18026
+      "sha256": "3348ec98d5a61ab338a00d765232fadca2f23c8696ac0fbe80fe84e3d99f5290",
+      "bytes": 18600
     },
     {
       "path": "scripts/run_learning_loop.py",
@@ -7920,8 +7920,8 @@
     },
     {
       "path": "tests/test_direct_joint_control.py",
-      "sha256": "543ed7893248b164c0b05d6256579998e720a9d146b1fe9ab9e54c0eafff3322",
-      "bytes": 4729
+      "sha256": "cd96bbaf77fabb9429678e9f9819000c2982100f576760ce5031b8ebe3d5a722",
+      "bytes": 7981
     },
     {
       "path": "tests/test_gpt6_self_evolution.py",
@@ -7940,8 +7940,8 @@
     },
     {
       "path": "tests/test_task_learning_loop.py",
-      "sha256": "8673ceb24cd7b12327a0dc683756bacbad269593633d6bdd3c3ad6e8a91fe5be",
-      "bytes": 11985
+      "sha256": "e0d1151ee0246bce68982516b27cda2dc757fc45d6c5ce6ab18991e2899576b2",
+      "bytes": 13433
     },
     {
       "path": "tests/test_trajectory_ui.py",
@@ -7982,7 +7982,7 @@
     }
   },
   "snapshot_date": "2026-10-19",
-  "parent_github_commit": "cfee1f143920603fe723d121a7a25c18bee4ad8d",
+  "parent_github_commit": "baae7e876fc51d7837fe82116550cad8f796bfc7",
   "packaging": "Complete assembled source under source/; no separate upstream checkout is required",
   "source_counts": {
     "upstream_paths": 1472,
