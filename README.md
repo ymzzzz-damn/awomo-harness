@@ -1,51 +1,99 @@
-# AwomoPaw Harness
+# AwomoPaw 启动指南
 
-本仓库包含完整的 **QwenPaw 基础源码 + AwomoPaw 扩展和修改 + RoboDojo 接入与学习流程**。直接使用 `source/` 即可，无需再下载 QwenPaw 或先应用补丁。
+## 1. 安装框架
 
-AwomoPaw 的发行包和主命令叫 `awomopaw`，内部 Python 包仍叫 `qwenpaw`，兼容命令 `qwenpaw`、`copaw` 也保留。QwenPaw 部分位于 [`source/src/qwenpaw/`](source/src/qwenpaw/)，不是仅包含新增文件的空壳。
-
-## 代码位置
-
-| 路径 | 内容 |
-| --- | --- |
-| `source/src/qwenpaw/agents/` | 基础 agent、记忆、工具、技能和提示模板，以及 AwomoPaw 修改 |
-| `source/src/qwenpaw/providers/` | 模型供应商、模型路由和 Responses 兼容实现 |
-| `source/src/qwenpaw/app/` | API、工作区、渠道、具身执行和编排 |
-| `source/src/qwenpaw/cli/` | 命令行入口 |
-| `source/console/` | 完整控制台前端源码和依赖锁文件 |
-| `source/website/` | QwenPaw 上游网站源码和文档 |
-| `source/embodiments/` | 仿真 embodiment 加载器和 RoboDojo 描述文件 |
-| `robodojo-overlay/` | RoboDojo 交互 harness 与 Awomopaw_Harness 策略接入 |
-| `runtime/gpt6-harness-ablation-adapter/` | GPT 直接关节控制、原生仿真交互与生命周期传输 |
-| `scripts/` | 子任务监督、视频复盘、技能蒸馏、跨场景记忆、open 任务评测与结果同步 |
-| `ui/trajectory/` | 视频、轨迹、评分和学习过程的查看界面 |
-| `tests/`、`source/tests/` | 集成与单元回归测试 |
-
-## 安装框架
-
-使用 Python 3.10–3.13，在仓库根目录执行：
+推荐 Linux、Python 3.10。运行仿真还需安装 RoboDojo/Isaac、官方场景资产、匹配的 NVIDIA 驱动、Conda 和 FFmpeg（包含 `ffprobe`）；仿真器安装见 [环境配置](docs/runtime.md#2-准备独立的-robodojoisaac-环境)。
 
 ```bash
-python -m venv .venv
+git clone https://github.com/ymzzzz-damn/awomo-harness.git
+cd awomo-harness
+PYTHON_BIN=python3.10 bash scripts/install.sh
 source .venv/bin/activate
-python -m pip install -e "./source[simulation,transport]"
-awomopaw --help
 ```
 
-控制台构建需要 Node.js/npm，可在 `source/console/` 执行 `npm ci --include=dev` 和 `npm run build`，再将 `dist/` 的内容复制到 `source/src/qwenpaw/console/`。也可以使用 `source/deploy/Dockerfile`，其中包含前端构建步骤。生成后的前端产物不提交到仓库。
+后续命令均在仓库根目录、激活 `.venv` 后执行。
 
-## 监督与学习
+## 2. 配置 GPT
 
-任务执行在 subtask 返回或动作片段达到上限时进行监督，默认每段最多 40 步。成功与失败任务都会进行视频复盘；成功任务蒸馏 `SKILL.md`、`memory.json` 和 `task-artifact.json`，供后续同任务场景生成策略；失败反馈进入记忆，并保留已有成功技能。open 评测脚本保留任务、seed、layout 的独立身份、跨 seed 的记忆顺序及模型身份校验。
+初始化配置，注册支持图片和 Responses API 的模型服务，并按提示输入 API Key。已有配置时可跳过对应步骤。
 
-部署配置见 [`docs/runtime.md`](docs/runtime.md)。完整性核对见 [`docs/source-completeness.md`](docs/source-completeness.md)，逐文件 SHA-256 清单见 [`SOURCE_MANIFEST.json`](SOURCE_MANIFEST.json)。
+```bash
+awomopaw init --defaults
+awomopaw models add-provider gpt6 --name 'GPT Gateway' \
+  --base-url https://ai.zhimiaonengzhi.com/v1
+awomopaw models config-key gpt6
+awomopaw models add-model gpt6 --model-id gpt-6-astra --model-name gpt-6-astra
+```
 
-通用运行入口是 `python scripts/run_learning_loop.py --help`。配置仿真器与 GPT provider 后，可指定 task、seed、layout 和 GPU；入口自动执行三路视频复盘、成功技能蒸馏和下一场同任务复用，并支持 `--resume`。完整命令见 [运行完整学习循环](docs/runtime.md#5-运行完整学习循环)。
+使用其他服务时替换 `--base-url`；运行时的 `--provider` 和 `--model` 须与实际配置、服务支持的模型一致。API Key 只在本机交互输入。
 
-## 源码范围与依赖
+## 3. 接入 RoboDojo
 
-本次完整源码以 QwenPaw `e6e0dcd85b11212d3bf945a724adc295baa03902` 为基础，包含已发布的 AwomoPaw 修改，并同步本地近期的评测、学习和查看器代码。上游许可证与声明保存在 `source/LICENSE`、根目录 `LICENSE` 和 `NOTICE`。`patches/awomopaw.patch` 保留用于追溯原有修改；日常安装直接使用 `source/`。
+将下面两个路径替换为已安装的 RoboDojo 目录和其独立仿真环境的 Python：
 
-当前 GPT 路径采用“画面和关节状态 → GPT 生成关节动作块 → 仿真执行 → 反馈”的闭环，已移除原代码策略 worker 及其 SAM3/CuRobo primitive 依赖。每块最多 40 步，支持更短执行窗口与执行后反思。任务成功率需要单独评测。
+```bash
+export ROBODOJO_ROOT=/absolute/path/RoboDojo
+export SIM_PYTHON=/absolute/path/RoboDojo-env/bin/python
 
-RoboDojo/Isaac 仿真器、官方场景资产、GPT 凭据和独立真机驱动不在本仓库内。GPT 直接控制不需要 SAM3 或 VLA 权重。完整安装与接线步骤见 [docs/runtime.md](docs/runtime.md)。框架 wheel 已包含 embodiment 加载器和描述文件，`embodiments` extra 作为兼容名称保留。
+bash scripts/install_sim_transport.sh
+export ROBODOJO_CLIENT_PYTHONPATH="$PWD/runtime-state/sim-transport"
+
+python scripts/configure_robodojo.py \
+  --robodojo-root "$ROBODOJO_ROOT" \
+  --transport-python "$PWD/.venv/bin/python" \
+  --output "$PWD/runtime-state/demo" \
+  --task align_blocks --seed 0 --layout 0
+```
+
+接入命令只需执行一次；`--output` 须使用尚不存在的目录。若 Conda 不在 `PATH`，先设置 `ROBODOJO_CONDA_BIN_DIR=/absolute/path/miniconda3/bin`；仿真 Conda 环境名称默认是 `RoboDojo`，其他名称用 `ROBODOJO_EVAL_ENV` 指定。
+
+## 4. 启动 GPT 直控与学习循环
+
+先检查配置和模型图片接口（会调用一次模型 API）：
+
+```bash
+python scripts/run_learning_loop.py \
+  --sim-root "$ROBODOJO_ROOT" \
+  --registry "$PWD/runtime-state/demo/registry.json" \
+  --output "$PWD/runtime-state/align-run" \
+  --task align_blocks --seeds 0 --layouts 0 1 \
+  --provider gpt6 --model gpt-6-astra --gpu 0 \
+  --dry-run --probe-model
+```
+
+检查通过后，正式启动：
+
+```bash
+python scripts/run_learning_loop.py \
+  --sim-root "$ROBODOJO_ROOT" \
+  --registry "$PWD/runtime-state/demo/registry.json" \
+  --output "$PWD/runtime-state/align-run" \
+  --task align_blocks --seeds 0 --layouts 0 1 \
+  --provider gpt6 --model gpt-6-astra --gpu 0 --resume
+```
+
+入口会自动启动仿真桥接和 agent。成功与失败任务均进行视频复盘；成功任务生成 `SKILL.md`、`memory.json`、`task-artifact.json`，供后续同任务场景使用。
+
+按需修改 `--task`、`--seeds`、`--layouts` 和 `--gpu`。运行状态、视频与学习产物保存在 `runtime-state/align-run/`。同一轮续跑使用原命令和 `--resume`；新一轮更换 `--output`。新开终端时须重新激活 `.venv` 并设置第 3 步的环境变量。
+
+## 5. 可选：启动 Web 控制台
+
+安装 Node.js/npm 后，首次构建前端：
+
+```bash
+cd source/console
+npm ci --include=dev
+npm run build
+mkdir -p ../src/qwenpaw/console
+cp -R dist/. ../src/qwenpaw/console/
+cd ../..
+```
+
+选择默认模型并启动服务：
+
+```bash
+awomopaw models set-llm
+awomopaw app --host 127.0.0.1 --port 8088
+```
+
+浏览器打开 <http://127.0.0.1:8088>。命令行学习循环可独立运行，无需启动 Web 控制台。
